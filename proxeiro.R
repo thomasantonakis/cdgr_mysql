@@ -4,12 +4,14 @@ library(RMySQL)
 ptm <- proc.time()
 # Establish connection
 con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
-                                  user = "tantonakis", password = "2secret4usAll!")
+                 user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
 
-SELECT * 
+SELECT `user_id`, `order_amt`
 FROM `order_master`
+WHERE `user_id`
+IN ( 90001,  118951 )
 LIMIT 0 , 3000
 
 
