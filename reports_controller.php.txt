@@ -1,0 +1,2414 @@
+﻿<?php
+/* SVN FILE: $Id: reports_controller.php 7945 2008-12-19 02:16:01Z gwoo $ */
+/**
+ * Static content controller.
+ *
+ * This file will render views from views/reports/
+ *
+ * PHP versions 4 and 5
+ *
+ * CakePHP(tm) :  Rapid Development Framework (http://www.cakephp.org)
+ * Copyright 2005-2008, Cake Software Foundation, Inc. (http://www.cakefoundation.org)
+ *
+ * Licensed under The MIT License
+ * Redistributions of files must retain the above copyright notice.
+ *
+ * @filesource
+ * @copyright     Copyright 2005-2008, Cake Software Foundation, Inc. (http://www.cakefoundation.org)
+ * @link          http://www.cakefoundation.org/projects/info/cakephp CakePHP(tm) Project
+ * @package       cake
+ * @subpackage    cake.cake.libs.controller
+ * @since         CakePHP(tm) v 0.2.9
+ * @version       $Revision: 7945 $
+ * @modifiedby    $LastChangedBy: gwoo $
+ * @lastmodified  $Date: 2008-12-18 18:16:01 -0800 (Thu, 18 Dec 2008) $
+ * @license       http://www.opensource.org/licenses/mit-license.php The MIT License
+ */
+/**
+ * Static content controller
+ *
+ * Override this controller by placing a copy in controllers directory of an application
+ *
+ * @package       cake
+ * @subpackage    cake.cake.libs.controller
+ */
+class ReportsController extends AppController {
+	/**
+	 * Controller name
+	 *
+	 * @var string
+	 * @access public
+	 */
+	var $name = 'Reports';
+	/**
+	 * Default helper
+	 *
+	 * @var array
+	 * @access public
+	 */
+ 
+	var $helpers = array('Html', 'Form', 'Javascript', 'Ajax');
+	
+	var $components = array('RequestHandler', 'Filter',"Captcha",'Email');
+	/**
+	 * This controller does not use a model
+	 *
+	 * @var array
+	 * @access public
+	 */
+	var $uses = array('prefecturedetail', 'clientappdump');
+	#var $uses = array('page', 'order', 'orderdetail', 'customer', 'restaurant', 'restaurantcuisine', 'cuisinedetail', 'item','review');
+	/**
+	 * Displays a view
+	 *
+	 * @param mixed What page to display
+	 * @access public
+	 */
+
+	var $custom_stats_queries = array(
+		"number_of_users_at_end_of_month" => array(
+			"query" => "SELECT 'REGISTERED_USERS' AS Type, COUNT(*) AS Number FROM `user_master`
+				WHERE `is_deleted` = 'N'
+				AND `user_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+				UNION
+				SELECT 'VERIFIED_USERS' AS Type, COUNT(*) AS Number FROM `user_master`
+				WHERE `is_deleted` = 'N'
+				AND `user_master`.`status` = 'VERIFIED'
+				AND `user_master`.`verification_date` < UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"active_users_at_month" => array(
+			"query" => "SELECT 'TOTAL_ACTIVE_USERS' AS Type, COUNT(DISTINCT user_id) AS Number FROM `order_master`
+				WHERE `order_master`.`status` IN ('VERIFIED','REJECTED')
+				AND `order_master`.`is_deleted` = 'N'
+				AND `order_master`.`i_date` > UNIX_TIMESTAMP(:month)
+				AND `order_master`.`i_date` <= UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+				UNION
+				SELECT 'MOBILE_ACTIVE_USERS' AS Type, COUNT(DISTINCT user_id) AS Number FROM `order_master`
+				WHERE `order_master`.`status` IN ('VERIFIED','REJECTED')
+				AND `order_master`.`order_referal` IN ('Android','IOS')
+				AND `order_master`.`is_deleted` = 'N'
+				AND `order_master`.`i_date` > UNIX_TIMESTAMP(:month)
+				AND `order_master`.`i_date` <= UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"restaurant_active_users_per_month" => array(
+			"query" => "SELECT YEAR(FROM_UNIXTIME(`order_master`.`i_date`)) AS YEAR, MONTH(FROM_UNIXTIME(`order_master`.`i_date`)) AS MONTH, COUNT(DISTINCT `order_master`.`user_id`) AS USERS FROM `order_master`
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						WHERE restaurant_shortname LIKE ':restaurant_shortname'
+						AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_SUB(:to_date, INTERVAL 1 DAY))
+						GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`))",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":restaurant_shortname" => array(
+					"id" => "restaurant_shortname",
+					"type" => Placeholders::Str,
+					"info" => "Examples:<ul><li><i>dominos_nea_smirni</i> - Search for the <b>exact</b> restaurant shortname name</li><li><i>dominos%</i> - Search for restaurant shortnames <b>starting</b> with <i>dominos</i></li><li><i>%nea_smirni</i> - Search for restaurant shortnames <b>ending</b> with <i>nea_smirni</i></li><li><i>%dominos%</i> - Search for restaurant shortnames <b>containing</b> <i>dominos</i></li></ul>"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"restaurant_total_active_users" => array(
+			"query" => "SELECT COUNT(DISTINCT `order_master`.`user_id`) AS USERS FROM `order_master`
+				JOIN `restaurant_master`
+				USING (`restaurant_id`)
+				WHERE restaurant_shortname LIKE ':restaurant_shortname'
+				AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+				AND `order_master`.`is_deleted` = 'N'
+				AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_SUB(:to_date, INTERVAL 1 DAY))",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":restaurant_shortname" => array(
+					"id" => "restaurant_shortname",
+					"type" => Placeholders::Str,
+					"info" => "Examples:<ul><li><i>dominos_nea_smirni</i> - Search for the <b>exact</b> restaurant shortname name</li><li><i>dominos%</i> - Search for restaurant shortnames <b>starting</b> with <i>dominos</i></li><li><i>%nea_smirni</i> - Search for restaurant shortnames <b>ending</b> with <i>nea_smirni</i></li><li><i>%dominos%</i> - Search for restaurant shortnames <b>containing</b> <i>dominos</i></li></ul>"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"total_verified_users_per_area_per_month" => array(
+			"query" => "SELECT YEAR(FROM_UNIXTIME(`user_master`.`verification_date`)) AS YEAR, MONTH(FROM_UNIXTIME(`user_master`.`verification_date`)) AS MONTH, `city_detail`.`city_name` AS CITY_NAME, `prefecture_detail`.`prefecture_name` AS PREFECTURE, count(DISTINCT `user_master`.`user_id`) AS VERIFIED_USERS
+				FROM `user_master`
+				LEFT JOIN `user_address`
+					ON (`user_master`.`user_id` = `user_address`.`user_id`)
+				LEFT JOIN `city_master`
+					ON (`user_address`.`city_id` = `city_master`.`city_id`)
+				LEFT JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+				LEFT JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+				WHERE (`user_master`.`is_deleted` = 'N' AND `user_master`.`status` = 'VERIFIED'
+					AND `user_master`.`verification_date` >= UNIX_TIMESTAMP(:from_date)
+					AND `user_master`.`verification_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY)))
+				GROUP BY YEAR(FROM_UNIXTIME(`user_master`.`verification_date`)), MONTH(FROM_UNIXTIME(`user_master`.`verification_date`)),`city_detail`.`city_id`
+				ORDER BY YEAR DESC, MONTH DESC, PREFECTURE ASC,  CITY_NAME ASC",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"total_active_users_per_area_per_month" => array(
+			"query" => "SELECT YEAR(FROM_UNIXTIME(`order_master`.`i_date`)) AS YEAR, MONTH(FROM_UNIXTIME(`order_master`.`i_date`)) AS MONTH, `city_detail`.`city_name` AS CITY_NAME, `prefecture_detail`.`prefecture_name` AS PREFECTURE, count(DISTINCT `order_master`.`user_id`) AS ACTIVE_USERS
+				FROM `order_master`
+				LEFT JOIN `user_address`
+					ON (`order_master`.`user_id` = `user_address`.`user_id`)
+				LEFT JOIN `city_master`
+					ON (`user_address`.`city_id` = `city_master`.`city_id`)
+				LEFT JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+				LEFT JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+				WHERE (`order_master`.`is_deleted` = 'N' AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+					AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+					AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY)))
+				GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`)),`city_detail`.`city_id`
+				ORDER BY YEAR DESC, MONTH DESC, PREFECTURE ASC,  CITY_NAME ASC",
+			"group" => "user_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"restaurant_orders_and_commissions" => array(
+			"query" => "SELECT `restaurant_shortname` AS `RESTAURANT_SHORTNAME`,
+				`restaurant_name` AS `RESTAURANT_NAME`,
+				`restaurantgroup_id` AS `CHAIN_ID`,
+				`city_name` AS `CITY_NAME`,
+				count(`order_master`.`order_id`) AS `ORDERS`,
+				ROUND(SUM(`order_master`.`order_amt`),2) AS `ORDERSUM`,
+				`commission_percentage` AS `RESTAURANT_COMMISSION`,
+				`classification` AS CLASSIFICATION
+				FROM `order_master`
+				JOIN `restaurant_master`
+				USING (`restaurant_id`)
+				JOIN `restaurant_detail`
+				ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = :lang)
+				LEFT JOIN `city_detail`
+				ON (`restaurant_master`.`restaurant_city_id` = `city_detail`.`city_id` AND `city_detail`.`language_id` = :lang)
+				where ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
+				AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+				GROUP BY `order_master`.`restaurant_id`
+				ORDER BY `restaurant_city_id` ASC, `restaurant_shortname` ASC",
+			"group" => "order_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"chain_orders_and_commissions" => array(
+			"query" => "SELECT `restaurantgroup_template` AS CHAIN, `restaurantgroup_id` AS `CHAIN_ID`, count(`order_master`.`order_id`) AS `ORDERS`,
+				ROUND(SUM(`order_master`.`order_amt`), 2) AS `ORDERSUM`, `commission_percentage` AS `RESTAURANT_COMMISSION`
+				FROM `order_master`
+				JOIN `restaurant_master`
+				USING (`restaurant_id`)
+				JOIN `restaurantgroup`
+				USING (`restaurantgroup_id`)
+				where ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
+				AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+				AND `restaurantgroup_id` > 0
+				GROUP BY `restaurantgroup_id`",
+			"group" => "order_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"total_orders_per_restaurant_area_per_month" => array(
+			"query" => "SELECT YEAR(FROM_UNIXTIME(`order_master`.`i_date`)) AS YEAR, MONTH(FROM_UNIXTIME(`order_master`.`i_date`)) AS MONTH, `city_detail`.`city_name` AS CITY_NAME, `restaurant_master`.`classification` AS CLASSIFICATION, `prefecture_detail`.`prefecture_name` AS PREFECTURE, count(`order_master`.`order_id`) AS `ORDERS`, ROUND(SUM(`order_master`.`order_amt`),2) AS `ORDERSUM`, ROUND(SUM(`order_master`.`order_commission`),2) AS `ORDER_COMMISSION`, COUNT(DISTINCT `restaurant_id`) AS NUMBER_OF_RESTAURANTS, `user_master`.`last_name` AS ACCOUNT_MANAGER
+				FROM `order_master`
+				JOIN `restaurant_master`
+					USING (`restaurant_id`)
+				LEFT JOIN `city_master`
+					ON (`restaurant_master`.`restaurant_city_id` = `city_master`.`city_id`)
+				LEFT JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+				LEFT JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+				LEFT JOIN `user_master`
+					ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
+				WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
+					AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+					AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+				GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`)), CLASSIFICATION, `city_detail`.`city_id`
+				ORDER BY YEAR DESC, MONTH DESC, PREFECTURE ASC, CITY_NAME ASC, CLASSIFICATION ASC",
+			"group" => "order_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"total_orders_per_user_area_per_month" => array(
+			"query" => "SELECT YEAR(FROM_UNIXTIME(`order_master`.`i_date`)) AS YEAR, MONTH(FROM_UNIXTIME(`order_master`.`i_date`)) AS MONTH, `city_detail`.`city_name` AS CITY_NAME, `prefecture_detail`.`prefecture_name` AS PREFECTURE, count(`order_master`.`order_id`) AS `ORDERS`, ROUND(SUM(`order_master`.`order_amt`),2) AS `ORDERSUM`, ROUND(SUM(`order_master`.`order_commission`),2) AS `ORDER_COMMISSION`, `user_master`.`last_name` AS ACCOUNT_MANAGER
+				FROM `order_master`
+				LEFT JOIN `user_address`
+					ON (`order_master`.`deliveryaddress_id` = `user_address`.`address_id`)
+				LEFT JOIN `city_master`
+					ON (`user_address`.`city_id` = `city_master`.`city_id`)
+				LEFT JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+				LEFT JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+				LEFT JOIN `user_master`
+					ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
+				WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
+					AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+					AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+				GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`)),`city_detail`.`city_id`
+				ORDER BY YEAR DESC, MONTH DESC, PREFECTURE ASC,  CITY_NAME ASC",
+			"group" => "order_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"number_of_restaurants_at_end_of_month" => array(
+			"query" => "SELECT 'Open_Restaurants' AS Type, COUNT(*) AS Number FROM `restaurant_master`
+						WHERE `restaurant_master`.`start_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+						AND `restaurant_id` != 19
+						AND (`restaurant_master`.`signoff_date` IS NULL OR `restaurant_master`.`signoff_date` >= DATE_ADD(:month, INTERVAL 1 MONTH))
+						UNION
+						SELECT 'Active_Restaurants' AS Type, COUNT( DISTINCT  `restaurant_id` )  AS Number
+						FROM  `restaurant_master` 
+						JOIN  `order_master` 
+						USING (  `restaurant_id` ) 
+						WHERE `restaurant_master`.`start_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+						AND `restaurant_id` != 19
+						AND `order_master`.`i_date` <= UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+						AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:month)
+						AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+						AND `order_master`.`is_deleted` = 'N'",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"open_restaurants_per_city_at_end_of_month" => array(
+			"query" => "SELECT `prefecture_detail`.`prefecture_name` AS PREFECTURE, `city_detail`.`city_name` AS CITY, `restaurant_master`.`restaurant_id` AS RESTAURANT_ID, `restaurant_master`.`restaurantgroup_id` AS CHAIN_ID, `restaurant_shortname` AS RESTAURANT, `user_master`.`last_name` AS ACCOUNT_MANAGER, CONCAT('T',`restaurant_master`.`classification`) AS CLASSIFICATION
+					FROM `restaurant_master`
+					JOIN `city_master`
+					ON (`restaurant_master`.`restaurant_city_id` = `city_master`.`city_id`)
+					JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+					JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+					JOIN `user_master`
+					ON (`restaurant_master`.`account_manager_id` = `user_master`.`user_id`)
+					WHERE `restaurant_master`.`start_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+					AND `restaurant_id` != 19
+					AND (`restaurant_master`.`signoff_date` IS NULL OR `restaurant_master`.`signoff_date` >= DATE_ADD(:month, INTERVAL 1 MONTH))
+					ORDER BY `prefecture_detail`.`prefecture_id`ASC, `restaurant_city_id` ASC, `restaurant_shortname` ASC",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":lang" => array('id' => "lang"),
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"number_of_open_restaurants_per_city_at_end_of_month" => array(
+			"query" => "SELECT `prefecture_detail`.`prefecture_name` AS PREFECTURE, `city_detail`.`city_name` AS CITY, `user_master`.`last_name` AS ACCOUNT_MANAGER,
+					COUNT(DISTINCT `restaurant_master`.`restaurant_id`) AS OPEN_RESTAURANTS
+					FROM `restaurant_master`
+					JOIN `city_master`
+					ON (`restaurant_master`.`restaurant_city_id` = `city_master`.`city_id`)
+					JOIN `city_detail`
+					ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+					JOIN `prefecture_detail`
+					ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+					JOIN `user_master`
+					ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
+					WHERE `restaurant_master`.`start_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+					AND `restaurant_id` != 19
+					AND (`restaurant_master`.`signoff_date` IS NULL OR `restaurant_master`.`signoff_date` >= DATE_ADD(:month, INTERVAL 1 MONTH))
+					GROUP BY `city_master`.`city_id`
+					ORDER BY `prefecture_detail`.`prefecture_id`ASC, `restaurant_city_id` ASC, `restaurant_shortname` ASC",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":lang" => array('id' => "lang"),
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"closed_restaurants_at_month" => array(
+			"query" => "SELECT `restaurant_master`.`restaurant_shortname` AS RESTAURANT,
+						`user_master`.`last_name` AS ACCOUNT_MANAGER,
+						`restaurant_master`.`signoff_date` AS SIGNOFF_DATE,
+						CONCAT('T',`restaurant_master`.`classification`) AS CLASSIFICATION
+						FROM `restaurant_master`
+						JOIN `user_master`
+						ON (`restaurant_master`.`account_manager_id` = `user_master`.`user_id`)
+						WHERE `restaurant_master`.`signoff_date` >= :month
+						AND `restaurant_master`.`signoff_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+						ORDER BY `user_master`.`last_name`, `restaurant_master`.`signoff_date`",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"new_active_restaurants_per_account_manager_at_month" => array(
+			"query" => "SELECT `user_master`.`last_name`,
+						YEAR(`restaurant_master`.`start_date`) AS Y,
+						MONTH(`restaurant_master`.`start_date`) AS M,
+						`restaurant_shortname` AS RESTAURANT,
+						CONCAT('T',`restaurant_master`.`classification`) AS CLASSIFICATION
+						FROM `restaurant_master`
+						JOIN `user_master`
+						ON (`restaurant_master`.`account_manager_id` = `user_master`.`user_id`)
+						LEFT JOIN `restaurantgroup`
+						ON (`restaurant_master`.`restaurant_shortname` =
+						`restaurantgroup`.`restaurantgroup_template`)
+						WHERE `restaurant_master`.`start_date` >= :month
+						AND `restaurant_master`.`start_date` < DATE_ADD(:month, INTERVAL 1 MONTH)
+						AND `restaurant_master`.`is_deleted` = 'N'
+						AND `restaurant_master`.`is_active` = 'Y'
+						AND `restaurantgroup`.`restaurantgroup_template` IS NULL
+						ORDER BY account_manager_id",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"number_of_restaurants_having_a_deal_per_area" => array(
+			"query" => "SELECT `user_master`.`LAST_NAME` AS ACCOUNT_MANAGER, `city_master`.`CITY_LINK`, COUNT(DISTINCT `restaurant_id`) AS TOTAL_DEALS, COUNT(DISTINCT CASE WHEN `deal_master`.`end` < NOW() THEN `restaurant_id` END) AS EXPIRED_DEALS, (SELECT COUNT(*) FROM `restaurant_master` AS inside_restaurant WHERE inside_restaurant.`restaurant_city_id` = `city_id` AND inside_restaurant.`is_active` = 'Y' AND inside_restaurant.`is_deleted` = 'N') AS TOTAL_RESTAURANTS
+						FROM `deal_master`
+						JOIN `restaurant_master`
+						USING(`restaurant_id`)
+						JOIN `city_master`
+						ON (`restaurant_city_id` = `city_id`)
+						JOIN (`user_master`)
+						ON (`account_manager_id` = `user_master`.`user_id`)
+						WHERE `deal_master`.`is_active` = 'Y'
+						AND `deal_master`.`is_deleted` = 'N'
+						AND `restaurant_master`.`is_active` = 'Y'
+						AND `restaurant_master`.`is_deleted` = 'N'
+						GROUP BY `account_manager_id`, `restaurant_city_id`",
+			"group" => "restaurant_statistics",
+			"placeholders" => array()
+		),
+		"terminals_and_clientapps_per_area" => array(
+			"query" => "SELECT `city_name` AS CITY, `user`.`last_name` AS ACCOUNT_MANAGER, COUNT(CASE WHEN `restaurant`.`polling` = 0 THEN `restaurant`.`restaurant_id` END) AS NUMBER_OF_TERMINALS, COUNT(CASE WHEN `restaurant`.`polling` = 1 THEN `restaurant`.`restaurant_id` END) AS NUMBER_OF_CLIENTAPPS
+						FROM `restaurant_master` AS restaurant
+						INNER JOIN `city_master` AS city
+						ON (`restaurant`.`restaurant_city_id` = `city`.`city_id`)
+						INNER JOIN `city_detail`
+						ON (`city_detail`.`city_id` = `city`.`city_id`)
+						INNER JOIN `user_master` AS user
+						ON (`city`.`city_account_manager_id` = `user`.`user_id`)
+						WHERE `restaurant`.`is_active` = 'Y' AND `restaurant`.`is_deleted` = 'N' AND `city_detail`.`language_id` = :lang
+						GROUP BY `restaurant`.`restaurant_city_id`
+						ORDER BY `city`.`prefecture_id`, `city_detail`.`city_name`",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":lang" => array('id' => "lang")
+			)
+		),
+		"chain_item_sales" => array(
+			"query" => "SELECT `item_detail`.`item_name` AS ITEM, SUM(`item_qty`) AS QUANTITY FROM `order_detail`
+						JOIN `order_master`
+						USING (`order_id`)
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						JOIN `item_master`
+						USING (`item_id`)
+						JOIN (`item_detail`)
+						ON (`item_detail`.`language_id` = :lang AND `item_master`.`item_id` = `item_detail`.`item_id`)
+						WHERE restaurant_master.restaurantgroup_id = :restaurant_group_id
+						AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						GROUP BY `item_detail`.`item_name`
+						ORDER BY SUM(`item_qty`) DESC",
+			"group" => "item_statistics",
+			"placeholders" => array(
+				":lang" => array( "id" => "lang" ),
+				":restaurant_group_id" => array(
+					"id" => "restaurant_group_id",
+					"type" => Placeholders::Numeric
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"restaurant_item_sales" => array(
+			"query" => "SELECT `item_detail`.`item_name` AS ITEM, SUM(`item_qty`) AS QUANTITY FROM `order_detail`
+						JOIN `order_master`
+						USING (`order_id`)
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						JOIN `item_master`
+						USING (`item_id`)
+						JOIN (`item_detail`)
+						ON (`item_detail`.`language_id` = :lang AND `item_master`.`item_id` = `item_detail`.`item_id`)
+						WHERE restaurant_master.restaurant_id = :restaurant_id
+						AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(:to_date)
+						GROUP BY `item_detail`.`item_name`
+						ORDER BY SUM(`item_qty`) DESC",
+			"group" => "item_statistics",
+			"placeholders" => array(
+				":lang" => array( "id" => "lang" ),
+				":restaurant_id" => array(
+					"id" => "restaurant_id",
+					"type" => Placeholders::Numeric
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"orders_having_specific_product" => array(
+			"query" => "SELECT COUNT(DISTINCT `order_id`) AS Order_count
+						FROM `order_master`
+						JOIN `order_detail`
+						USING (`order_id`)
+						JOIN `item_master`
+						USING (`item_id`)
+						JOIN (`item_detail`)
+						USING (`item_id`)
+						WHERE `order_master`.`i_date` > UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `item_detail`.`language_id` = :lang
+						AND (:like_conditions)",
+			"group" => "item_statistics",
+			"placeholders" => array(
+				":lang" => array("id" => "lang"),
+				":like_conditions" => array(
+					"id" => "item_name",
+					"type" => Placeholders::Strings,
+					"attribute" => "`item_detail`.`item_name`",
+					"info" => "Examples:<ul><li><i>amstel</i> - Search for the <b>exact</b> product name</li><li><i>amstel%</i> - Search for product names <b>starting</b> with <i>amstel</i></li><li><i>%amstel</i> - Search for product names <b>ending</b> with <i>amstel</i></li><li><i>%amstel%</i> - Search for product names <b>containing</b> <i>amstel</i></li></ul><p style=\'width:400px;\'><b>Note:</b> To search for multiple products use the symbol \'|\' to seperate between their names<br/><i style=\'color:#777;\'>e.g. %amstel%|heineken%|fix</i></p>"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		/*"items_of_a_specific_product" => array(
+			"query" => "SELECT COUNT(`item_detail`.`item_id`) AS Item_count
+						FROM `order_master`
+						JOIN `order_detail`
+						USING (`order_id`)
+						JOIN `item_master`
+						USING (`item_id`)
+						JOIN (`item_detail`)
+						USING (`item_id`)
+						WHERE `order_master`.`i_date` > UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `item_detail`.`language_id` = :lang
+						AND (:like_conditions)",
+			"group" => "item_statistics",
+			"placeholders" => array(
+				":lang" => array("id" => "lang"),
+				":like_conditions" => array(
+					"id" => "item_name",
+					"type" => Placeholders::Strings,
+					"attribute" => "`item_detail`.`item_name`",
+					"info" => "Examples:<ul><li><i>amstel</i> - Search for the <b>exact</b> product name</li><li><i>amstel%</i> - Search for product names <b>starting</b> with <i>amstel</i></li><li><i>%amstel</i> - Search for product names <b>ending</b> with <i>amstel</i></li><li><i>%amstel%</i> - Search for product names <b>containing</b> <i>amstel</i></li></ul><p style=\'width:400px;\'><b>Note:</b> To search for multiple products use the symbol \'|\' to seperate between their names<br/><i style=\'color:#777;\'>e.g. %amstel%|heineken%|fix</i></p>"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),*/
+
+		"special_item_sales" => array(
+			"query" => "SELECT `restaurant_master`.`restaurant_shortname` AS RESTAURANT, `city_detail`.`city_name` AS CITY, SUM(`item_qty`) AS QUANTITY,
+						ROUND(`restaurant_master`.`billing_special_item_cost`,2) AS COST_PER_ITEM,
+						ROUND(SUM(`item_qty`) * `restaurant_master`.`billing_special_item_cost`, 2) AS TOTAL_COST, `user_master`.`last_name` AS ACCOUNT_MANAGER
+						FROM `order_detail`
+						JOIN `order_master`
+						USING (`order_id`)
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						LEFT JOIN `city_detail`
+						ON (`city_detail`.`language_id` = :lang AND `city_detail`.`city_id` = `restaurant_master`.`restaurant_city_id`)
+						JOIN `item_master`
+						USING (`item_id`)
+						JOIN `category_master`
+						USING (`category_id`)
+						JOIN (`item_detail`)
+						ON (`item_detail`.`language_id` = :lang AND `item_master`.`item_id` = `item_detail`.`item_id`)
+						JOIN `user_master`
+						ON (`restaurant_master`.`account_manager_id` = `user_master`.`user_id`)
+						WHERE `category_master`.`is_special` = 1
+						AND `order_master`.`status` IN ('VERIFIED','REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						AND `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						GROUP BY `restaurant_master`.`restaurant_shortname`
+						ORDER BY SUM(`item_qty`) DESC",
+			"group" => "item_statistics",
+			"placeholders" => array(
+				":lang" => array( "id" => "lang" ),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"verified_users_per_source" => array(
+			"query" => "SELECT COUNT(*) AS VERIFIED_USERS, `user_master`.`referal_source` AS SOURCE, `city_detail`.`city_name` AS CITY, `prefecture_detail`.`prefecture_name` AS PREFECTURE
+						FROM `user_master`
+						LEFT JOIN `user_address`
+						ON (`user_address`.`is_default` = 'Y' AND `user_address`.`user_id` = `user_master`.`user_id`)
+						LEFT JOIN `city_master`
+						ON (`user_address`.`city_id` = `city_master`.`city_id`)
+						LEFT JOIN `city_detail`
+						ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+						LEFT JOIN `prefecture_detail`
+						ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+						WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `user_master`.`verification_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `user_master`.`status` = 'VERIFIED'
+						AND `user_master`.`is_deleted` = 'N'
+						GROUP BY `user_master`.`referal_source`, `city_master`.`city_id`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(				
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"verified_users_per_source_at_month" => array(
+			"query" => "SELECT COUNT(*) AS VERIFIED_USERS, `user_master`.`referal_source` AS SOURCE, `city_detail`.`city_name` AS CITY, `prefecture_detail`.`prefecture_name` AS PREFECTURE
+						FROM `user_master`
+						LEFT JOIN `user_address`
+						ON (`user_address`.`is_default` = 'Y' AND `user_address`.`user_id` = `user_master`.`user_id`)
+						LEFT JOIN `city_master`
+						ON (`user_address`.`city_id` = `city_master`.`city_id`)
+						LEFT JOIN `city_detail`
+						ON (`city_detail`.`language_id` = :lang AND `city_master`.`city_id` = `city_detail`.`city_id`)
+						LEFT JOIN `prefecture_detail`
+						ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+						WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP(:month)
+						AND `user_master`.`verification_date` < UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+						AND `user_master`.`status` = 'VERIFIED'
+						AND `user_master`.`is_deleted` = 'N'
+						GROUP BY `user_master`.`referal_source`, `city_master`.`city_id`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(				
+				":lang" => array(
+					"id" => "lang"
+				),
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"registered_users_per_source" => array(
+			"query" => "SELECT COUNT(*) AS REGISTERED_USERS, `user_master`.`status`, `user_master`.`referal_source` AS SOURCE
+						FROM `user_master`
+						WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `user_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `user_master`.`is_deleted` = 'N'
+						GROUP BY `user_master`.`status`, `user_master`.`referal_source`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"registered_users_per_source_at_month" => array(
+			"query" => "SELECT COUNT(*) AS REGISTERED_USERS, `user_master`.`status`, `user_master`.`referal_source` AS SOURCE
+						FROM `user_master`
+						WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP(:month)
+						AND `user_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+						AND `user_master`.`is_deleted` = 'N'
+						GROUP BY `user_master`.`status`, `user_master`.`referal_source`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"orders_per_source" => array(
+			"query" => "SELECT COUNT(*) AS VERIFIED_ORDERS, `order_master`.`order_referal` AS SOURCE, `city_detail`.`city_name` AS CITY, `prefecture_detail`.`prefecture_name` AS PREFECTURE, ROUND(SUM(`order_master`.`order_amt`),2) AS ORDER_VALUE, ROUND(SUM(`order_master`.`order_commission`),2) AS COMMISSION
+						FROM `order_master`
+						JOIN `user_address`
+						ON (`order_master`.`deliveryaddress_id` = `user_address`.`address_id`)
+						JOIN `city_master`
+						ON (`user_address`.`city_id` = `city_master`.`city_id`)
+						JOIN `city_detail`
+						ON (`city_detail`.`language_id` = :lang AND `user_address`.`city_id` = `city_detail`.`city_id`)
+						JOIN `prefecture_detail`
+						ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+						WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `order_master`.`status` IN ('VERIFIED', 'REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						GROUP BY `order_master`.`status`, `order_master`.`order_referal`, `city_detail`.`city_id`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(
+				":lang" => array(
+					"id" => "lang"
+				),
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"orders_per_source_at_month" => array(
+			"query" => "SELECT COUNT(*) AS VERIFIED_ORDERS, `order_master`.`order_referal` AS SOURCE, `city_detail`.`city_name` AS CITY, `prefecture_detail`.`prefecture_name` AS PREFECTURE, SUM(`order_master`.`order_amt`) AS ORDER_VALUE, SUM(`order_master`.`order_commission`) AS COMMISSION
+						FROM `order_master`
+						JOIN `user_address`
+						ON (`order_master`.`deliveryaddress_id` = `user_address`.`address_id`)
+						JOIN `city_master`
+						ON (`user_address`.`city_id` = `city_master`.`city_id`)
+						JOIN `city_detail`
+						ON (`city_detail`.`language_id` = :lang AND `user_address`.`city_id` = `city_detail`.`city_id`)
+						JOIN `prefecture_detail`
+						ON (`prefecture_detail`.`language_id` = :lang AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+						WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(:month)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:month, INTERVAL 1 MONTH))
+						AND `order_master`.`status` IN ('VERIFIED', 'REJECTED')
+						AND `order_master`.`is_deleted` = 'N'
+						GROUP BY `order_master`.`status`, `order_master`.`order_referal`, `city_detail`.`city_id`",
+			"group" => "marketing_statistics",
+			"placeholders" => array(			
+				":lang" => array(
+					"id" => "lang"
+				),
+				":month" => array(
+					"id" => "month",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"coupon_stats" => array(
+			"query" => "SELECT 'OLD' AS Type, COUNT(*) AS Number
+					FROM user_promos
+					JOIN user_master user
+					ON (user_promos.user_id != 0 AND user.user_id = user_promos.user_id AND user.status = 'VERIFIED' AND promo_id RLIKE ':coupon_code')
+					WHERE user.verification_date < user_promos.valid_after
+					UNION
+					SELECT 'NEW' AS Type, COUNT(*) AS Number
+					FROM user_promos
+					JOIN user_master user
+					ON (user_promos.user_id != 0 AND user.user_id = user_promos.user_id AND user.status = 'VERIFIED' AND promo_id RLIKE ':coupon_code')
+					WHERE user.verification_date >= user_promos.valid_after
+					UNION
+					SELECT 'UNVERIFIED' AS Type, COUNT(*) AS Number
+					FROM `user_promos`
+					JOIN `user_master`
+					USING (`user_id`)
+					WHERE `promo_id` RLIKE ':coupon_code'
+					AND user_id != 0
+					AND `status` IN ('NEW','MANUAL')
+					UNION
+					SELECT 'TOTAL' AS Type, COUNT(*) AS Number
+					FROM `user_promos`
+					JOIN `user_master` user
+					USING (`user_id`)
+					WHERE `promo_id` RLIKE ':coupon_code'
+					AND user.status IN ('VERIFIED','NEW','MANUAL')",
+			"group" => "marketing_statistics",
+			"placeholders" => array(
+				":coupon_code" => array(
+					"id" => "coupon_code",
+					"type" => Placeholders::Str,
+					"info" => "Examples:<ul><li><i>^C0123456789$</i> - Search for the <b>exact</b> coupon code</li><li><i>^C012</i> - Search for coupon codes <b>starting</b> with <i>C012</i></li><li><i>6789$</i> - Search for coupon codes <b>ending</b> with <i>6789</i></li><li><i>3456</i> - Search for coupon codes <b>containing</b> <i>3456</i></li><li><i>No text</i> - So coupon series</li></ul>"
+				)
+			)
+		),
+		"secret_promo_stats" => array(
+			"query" => "SELECT promouser.secret_promo_id AS PROMO,
+					SUM(IF(user.status='VERIFIED', 1, 0)) AS TOTAL_VERIFIED,
+					SUM(IF(user.status='NEW', 1, 0)) AS TOTAL_UNVERIFIED,
+					SUM(IF(user.status='VERIFIED' AND user.i_date < UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS OLD_VERIFIED,
+					SUM(IF(user.status='NEW' AND user.i_date < UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS OLD_UNVERIFIED,
+					SUM(IF(user.status='VERIFIED' AND user.i_date >= UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS NEW_VERIFIED,
+					SUM(IF(user.status='NEW' AND user.i_date >= UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS NEW_UNVERIFIED
+					FROM secret_promo_user AS promouser
+					INNER JOIN secret_promo_master AS promo
+					USING(secret_promo_id)
+					INNER JOIN user_master AS user
+					USING(user_id)
+					WHERE promo.is_deleted = 'N'
+					GROUP BY secret_promo_id
+					UNION
+					SELECT 'TOTAL',
+					SUM(IF(t.status='VERIFIED', 1, 0)) AS TOTAL_VERIFIED,
+					SUM(IF(t.status='NEW', 1, 0)) AS TOTAL_UNVERIFIED,
+					SUM(IF(t.status='VERIFIED' AND t.i_date < UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS OLD_VERIFIED,
+					SUM(IF(t.status='NEW' AND t.i_date < UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS OLD_UNVERIFIED,
+					SUM(IF(t.status='VERIFIED' AND t.i_date >= UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS NEW_VERIFIED,
+					SUM(IF(t.status='NEW' AND t.i_date >= UNIX_TIMESTAMP('2014/11/19'), 1, 0)) AS NEW_UNVERIFIED
+					FROM (
+						SELECT user.status, user.i_date, promo.secret_promo_id FROM secret_promo_user AS promouser
+						INNER JOIN secret_promo_master AS promo USING(secret_promo_id)
+						INNER JOIN user_master AS user ON (user.user_id = promouser.user_id)
+						WHERE promo.is_deleted = 'N'
+						GROUP BY user.user_id
+					) AS t",
+			"group" => "marketing_statistics",
+			"placeholders" => array()
+		),
+		"restaurant_balances" => array(
+			"query" => "SELECT `transaction_date`, `balance_type`, `transaction_number`, ROUND(`balance_amount`, 2) AS balance_amount, `restaurant_shortname`, `name`, `vat_id`
+						FROM `restaurant_balance`
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						JOIN `company_master`
+						USING (`company_id`)
+						WHERE `balance_amount` <= 0
+						AND `transaction_date` >= :transaction_date
+						AND `transaction_date` < DATE_ADD(:transaction_date, INTERVAL 1 MONTH)
+						ORDER BY `transaction_date`",			
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":transaction_date" => array(
+					"id" => "transaction_date",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"restaurant_payments" => array(
+			"query" => "SELECT `restaurantbalance_id`, `transaction_date`, `balance_type`, `transaction_number`, (-1 * ROUND(`balance_amount`, 2)) AS balance_amount, `restaurant_shortname`, `name`, `vat_id`,
+						CASE
+							WHEN `balance_type` = 'CASH PAYMENT' THEN '38.01.00.0000'
+							WHEN `balance_type` = 'PIRAEUS PAYMENT' THEN '38.02.00.0000'
+							WHEN `balance_type` = 'EUROBANK PAYMENT' THEN '38.02.00.0001'
+						END AS accounting_account
+						FROM `restaurant_balance`
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						JOIN `company_master`
+						USING (`company_id`)
+						WHERE `balance_amount` <= 0
+						AND `balance_type` IN ('PAYMENT','CASH PAYMENT','EUROBANK PAYMENT','PIRAEUS PAYMENT')
+						AND `transaction_date` >= :transaction_date
+						AND `transaction_date` < DATE_ADD(:transaction_date, INTERVAL 1 MONTH)
+						ORDER BY `transaction_date`",			
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":transaction_date" => array(
+					"id" => "transaction_date",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"account_receivables_per_account_manager" => array(
+			"query" => "SELECT
+						user_master.last_name,
+						-1*ROUND(SUM(outterrestaurantbalance.RECEIVABLES), 2) AS RECEIVABLES,
+						-1*ROUND(SUM(
+						CASE WHEN outterrestaurantbalance.TOTAL_REST_BALANCE >= 0 THEN outterrestaurantbalance.SETOFF
+						WHEN (outterrestaurantbalance.SETOFF - outterrestaurantbalance.TOTAL_REST_BALANCE) < 0 THEN (outterrestaurantbalance.SETOFF - outterrestaurantbalance.TOTAL_REST_BALANCE)
+						ELSE 0 END
+						), 2) AS SETOFF
+						FROM (
+						SELECT
+						restaurantbalance.restaurant_id,
+						ROUND(SUM(CASE WHEN (restaurantbalance.balance_amount < 0 AND balance_type IN ('BANK PAYMENT', 'CASH PAYMENT', 'EUROBANK PAYMENT', 'PIRAEUS PAYMENT')) THEN restaurantbalance.balance_amount ELSE 0 END), 2) AS RECEIVABLES,
+						SUM(CASE WHEN (balance_type = 'PAYBACK' OR (balance_type = 'SETOFF' AND transaction_number != 'Συμψηφισμός από κουπόνια')) THEN restaurantbalance.balance_amount ELSE 0 END) AS SETOFF,
+						innerrestaurantbalance.TOTAL_REST_BALANCE
+						FROM restaurant_balance AS restaurantbalance
+						INNER JOIN (
+						SELECT irb.restaurant_id, SUM(irb.balance_amount) AS TOTAL_REST_BALANCE
+						FROM restaurant_balance AS irb
+						WHERE irb.transaction_date < DATE_ADD(:to_date, INTERVAL 1 DAY)
+						GROUP BY irb.restaurant_id
+						) AS innerrestaurantbalance USING(restaurant_id)
+						WHERE restaurantbalance.balance_type IN ('BANK PAYMENT', 'CASH PAYMENT', 'EUROBANK PAYMENT', 'PIRAEUS PAYMENT', 'SETOFF')
+						AND `restaurantbalance`.`transaction_date` < DATE_ADD(:to_date, INTERVAL 1 DAY)
+						AND `restaurantbalance`.`transaction_date` >= :from_date
+						GROUP BY restaurantbalance.restaurant_id
+						) AS outterrestaurantbalance
+						INNER JOIN restaurant_master USING (restaurant_id)
+						INNER JOIN user_master ON (restaurant_master.account_manager_id = user_master.user_id)
+						GROUP BY user_master.user_id",
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"account_receivables_totals_at_date" => array(
+			"query" => "SELECT user.last_name AS ACCOUNT_MANAGER,
+						ROUND(SUM(IF(total_rest_balances.rest_balance >= 0, total_rest_balances.rest_balance, 0)), 2) AS TOTAL_RECEIVABLES,
+						ROUND(SUM(IF(total_rest_balances.rest_balance >= 20, total_rest_balances.rest_balance, 0)), 2) AS TOTAL_RECEIVABLES_OVER_THRESHOLD,
+						ROUND(SUM(IF(total_rest_balances.rest_balance < 0, total_rest_balances.rest_balance, 0)), 2) AS TOTAL_PAYABLES,
+						ROUND(SUM(total_rest_balances.rest_balance), 2) AS TOTAL_BALANCE,
+						ROUND(SUM(IF(((restaurant.is_active = 'N' OR restaurantschedule.is_active = 'N') AND restaurant.is_deleted='N'),total_rest_balances.rest_balance, 0)), 2) AS TOTAL_LOCKED,
+						ROUND(SUM(IF(restaurant.is_deleted = 'Y', total_rest_balances.rest_balance, 0)), 2) AS TOTAL_DELETED
+						FROM (
+						SELECT restaurant_id, SUM(restaurantbalance.balance_amount) as rest_balance
+						FROM restaurant_balance AS restaurantbalance
+						WHERE restaurantbalance.transaction_date < DATE_ADD(:to_date, INTERVAL 1 DAY)
+						GROUP BY restaurantbalance.restaurant_id
+						) AS total_rest_balances
+						INNER JOIN restaurant_master AS restaurant
+						USING (restaurant_id)
+						INNER JOIN user_master AS user
+						ON (user.user_id = restaurant.account_manager_id)
+						INNER JOIN restaurant_schedule AS restaurantschedule
+						ON (restaurant.restaurant_id = restaurantschedule.restaurant_id)
+						GROUP BY user.user_id",
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date
+				))
+		),
+		"coupon_costs" => array(
+			"query" => "SELECT `restaurant_shortname` AS RESTAURANT, ROUND(SUM(`disc_amt`), 2) AS DISCOUNT
+						FROM `order_master`
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND `order_master`.`status` = 'VERIFIED'
+						AND `order_master`.`is_deleted` = 'N'
+						GROUP BY `restaurant_id`
+						HAVING DISCOUNT > 0
+						ORDER BY DISCOUNT DESC",
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array( 
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"restaurant_invoices_for_month" => array(
+			"query" => "SELECT `invoice_date`, `invoice_series`, `invoice_number`, `invoice_type`, ROUND(`net_amount`, 2) AS net_amount, ROUND(`vat_amount`, 2) AS vat_amount, `total_amount`,`restaurant_shortname`, `name`, `vat_id`
+						FROM `invoices`
+						JOIN `company_master`
+						USING (`company_id`)
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						WHERE 
+						(MONTH(:invoice_date) = 1 AND `invoice_date` = DATE_SUB(:invoice_date, INTERVAL 1 DAY)) 
+						OR (MONTH(:invoice_date) != 1 AND
+						`invoice_date` >= :invoice_date
+						AND `invoice_date` < DATE_ADD(:invoice_date, INTERVAL 10 DAY))
+						ORDER BY `invoice_series`, `invoice_number`",
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":invoice_date" => array(
+					"id" => "invoice_date",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
+		"catalog_report" => array(
+			"query" => "SELECT user.last_name AS Agent, catalog.name AS Catalog
+						FROM  `catalog_master` AS catalog
+						JOIN `user_master` AS user
+						ON catalog.u_by = user.user_id
+						WHERE  catalog.`is_deleted` LIKE 'N'
+                                                AND catalog.`i_date` >= UNIX_TIMESTAMP(:from_date)
+                                                AND catalog.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						ORDER BY  user.last_name ASC, catalog.`i_date` ASC",
+			"group" => "backoffice_statistics",
+                        "placeholders" => array(
+                                ":from_date" => array(
+                                        "id" => "from_date",
+                                        "type" => Placeholders::Date,
+                                        "relations" => array(
+                                                array(
+                                                        "with" => "to_date",
+                                                        "type" => "<="
+                                                )
+                                        )
+                                ),
+                                ":to_date" => array(
+                                        "id" => "to_date",
+                                        "type" => Placeholders::Date,
+                                        "relations" => array(
+                                                array(
+                                                        "with" => "from_date",
+                                                        "type" => ">="
+                                                )
+                                        )
+                                )
+                        )
+		),
+	);
+
+	function createDateRangeArray($strDateFrom,$strDateTo) {
+		// takes two dates formatted as YYYY-MM-DD and creates an
+		// inclusive array of the dates between the from and to dates.
+
+		// could test validity of dates here but I'm already doing
+		// that in the main script
+
+		$aryRange=array();
+
+		$iDateFrom=strtotime($strDateFrom);
+		$iDateTo=strtotime($strDateTo);
+
+		if ($iDateFrom<$iDateTo) {
+			$aryRange[date('Y-m-d',$iDateFrom)] = "first"; // first entry
+			$prev = date('Y-m-d',$iDateFrom);
+			while ($iDateFrom<$iDateTo) {
+				$iDateFrom+=86400; // add 24 hours
+				$aryRange[date('Y-m-d',$iDateFrom)] = $prev;
+				$prev = date('Y-m-d',$iDateFrom);
+			}
+		} else {
+			$aryRange[date('Y-m-d',$iDateFrom+86400)] = date('Y-m-d',$iDateFrom); // first entry
+			$aryRange[date('Y-m-d',$iDateFrom)] = ""; // second entry
+			$prev = date('Y-m-d',$iDateFrom);
+			while ($iDateFrom>$iDateTo) {
+				$iDateFrom-=86400; // subtract 24 hours
+				$aryRange[date('Y-m-d',$iDateFrom)] = "";
+				$aryRange[$prev] = date('Y-m-d',$iDateFrom);
+				$prev = date('Y-m-d',$iDateFrom);
+			}
+
+			$aryRange[$prev] = "last";
+
+
+		}
+		//debug($aryRange);
+		return $aryRange;
+	}
+
+	function admin_graphs()
+	{
+		$this->admin_checkSession();
+
+		$db = ConnectionManager::getInstance();
+		$conn = $db->getDataSource('default');
+
+		$localtime = localtime(time(), true);
+
+		$temp_results = $conn->fetchall("
+			SELECT COUNT(`restaurant_id`) as count FROM `restaurant_master`
+			LEFT JOIN `restaurantgroup`
+			ON (`restaurant_master`.`restaurant_shortname` = `restaurantgroup`.`restaurantgroup_template`)
+			WHERE `restaurant_master`.`is_active` = 'Y'
+			AND `restaurant_master`.`is_deleted` = 'N'
+			AND `restaurant_id` != 19
+			AND `restaurantgroup`.`restaurantgroup_template` IS NULL
+			");
+		$total_restaurants=$temp_results[0][0]['count'];
+		$this->set("total_restaurants", $total_restaurants + 61); # Add pizza_fan (61)
+
+		$temp_results = $conn->fetchall("
+			SELECT COUNT(`order_id`) as count FROM `order_master`
+			WHERE `order_master`.`i_date` > UNIX_TIMESTAMP(CURDATE())
+			AND (`status` = 'VERIFIED' OR `status` = 'REJECTED')
+			AND `order_master`.`is_deleted` = 'N'
+			");
+		$today_orders=$temp_results[0][0]['count'];
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`i_date`), '%Y-%m-01')) as DATE, count(order_id) AS ORDERS FROM `order_master` WHERE `is_deleted` = 'N' AND (`status` = 'VERIFIED' or `status` = 'REJECTED') group by YEAR(FROM_UNIXTIME(`i_date`)), MONTH(FROM_UNIXTIME(`i_date`))
+			");
+
+		$orders_per_month = array();
+		$orders_per_month_est = array();
+		$array_elements = -1;
+
+		# Fill array
+		foreach($temp_results as $key => $val) {
+			$orders_per_month[] = array($val[0]["DATE"] * 1000, $val[0]["ORDERS"]);
+			$array_elements++;
+			
+		}
+
+		if (($array_elements > 1) && ($localtime["tm_mday"] > 1)) {
+
+			# Fill estimation array with last two values
+			$orders_per_month_est[] = $orders_per_month[$array_elements-1];
+			# Get last months orders, remove today's orders and make a guess for this month estimation
+			$orders_per_month_est[] = array($orders_per_month[$array_elements][0], round(($orders_per_month[$array_elements][1]-$today_orders)*30/($localtime["tm_mday"]-1)));
+		}
+
+		$this->set("orders_per_month", $orders_per_month);
+		$this->set("orders_per_month_est", $orders_per_month_est);
+
+		$temp_results = $conn->fetchall("
+			SELECT SUM(`order_commission`) AS SUM FROM `order_master`
+			JOIN `restaurant_master` USING(`restaurant_id`)
+			WHERE `order_master`.`i_date` > UNIX_TIMESTAMP(CURDATE())
+			AND (`status` = 'VERIFIED' OR `status` = 'REJECTED')
+			AND `order_master`.`is_deleted` = 'N'
+			");
+		$today_revenues=$temp_results[0][0]['SUM'];
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, ROUND(SUM(`order_commission`),2) AS COMMISSION FROM `order_master` JOIN `restaurant_master` USING(`restaurant_id`) WHERE `order_master`.`is_deleted` = 'N' AND (`status` = 'VERIFIED' or `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`))
+			");
+
+		$revenues_per_month = array();
+		$revenues_per_month_est = array();
+		$array_elements = -1;
+
+		# Fill array
+		foreach($temp_results as $key => $val) {
+			$revenues_per_month[] = array($val[0]["DATE"] * 1000, $val[0]["COMMISSION"]);
+			$array_elements++;
+			
+		}
+
+		if (($array_elements > 1) && ($localtime["tm_mday"] > 1)) {
+
+			# Fill estimation array with last two values
+			$revenues_per_month_est[] = $revenues_per_month[$array_elements-1];
+			# Get last months revenues, remove today's revenues and make a guess for this month estimation
+			$revenues_per_month_est[] = array($revenues_per_month[$array_elements][0], round(($revenues_per_month[$array_elements][1]-$today_revenues)*30/($localtime["tm_mday"]-1), 2));
+		}
+
+		$this->set("revenues_per_month", $revenues_per_month);
+		$this->set("revenues_per_month_est", $revenues_per_month_est);
+
+		$temp_results = $conn->fetchall("
+			SELECT COUNT(`user_id`) as count FROM user_master
+			WHERE `user_master`.`verification_date` > UNIX_TIMESTAMP(CURDATE())
+			AND `status` = 'VERIFIED'
+			AND `user_master`.`is_deleted` = 'N'
+			");
+		$today_customers=$temp_results[0][0]['count'];
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`user_master`.`verification_date`), '%Y-%m-01')) AS DATE, count(user_id) AS USERS from user_master where `is_deleted` = 'N' AND `status` = 'VERIFIED' group by YEAR(FROM_UNIXTIME(`verification_date`)), MONTH(FROM_UNIXTIME(`verification_date`))
+			");
+
+		$new_users_per_month = array();
+		$new_users_per_month_est = array();
+		$array_elements = -1;
+		
+		foreach($temp_results as $key => $val) {
+			$new_users_per_month[] = array($val[0]['DATE'] * 1000, $val[0]["USERS"]);
+			$array_elements++;
+		}
+
+		if (($array_elements > 1) && ($localtime["tm_mday"] > 1)) {
+
+			$new_users_per_month_est[] = $new_users_per_month[$array_elements-1];
+			$new_users_per_month_est[] = array($new_users_per_month[$array_elements][0], round(($new_users_per_month[$array_elements][1]-$today_customers)*30/($localtime["tm_mday"]-1)));
+		}
+
+		$this->set("new_users_per_month", $new_users_per_month);
+		$this->set("new_users_per_month_est", $new_users_per_month_est);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(ADDDATE(FROM_UNIXTIME(`order_master`.`i_date`), INTERVAL 1-DAYOFWEEK(FROM_UNIXTIME(`order_master`.`i_date`)) DAY)) AS DATE, COUNT(DISTINCT user_id) as ACTIVEUSERS from order_master where `is_deleted` = 'N' AND (`status` = 'VERIFIED' OR `status` = 'REJECTED') GROUP BY YEARWEEK(FROM_UNIXTIME(`i_date`))
+			");
+		$active_users_per_week = array();
+		foreach($temp_results as $key => $val) {
+			$active_users_per_week[] = array($val[0]['DATE'] * 1000, $val[0]["ACTIVEUSERS"]);
+		}
+		$this->set("active_users_per_week", $active_users_per_week);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, COUNT(DISTINCT user_id) as ACTIVEUSERS from order_master where `is_deleted` = 'N' AND (`status` = 'VERIFIED' OR `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`i_date`)), MONTH(FROM_UNIXTIME(`i_date`))
+			");
+		$active_users_per_month = array();
+		foreach($temp_results as $key => $val) {
+			$active_users_per_month[] = array($val[0]['DATE'] * 1000, $val[0]["ACTIVEUSERS"]);
+		}
+		$this->set("active_users_per_month", $active_users_per_month);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, COUNT(DISTINCT user_id) as ACTIVEUSERS from order_master where `is_deleted` = 'N' AND (`status` = 'VERIFIED' OR `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`i_date`)), QUARTER(FROM_UNIXTIME(`i_date`))
+			");
+		$active_users_per_quarter = array();
+		foreach($temp_results as $key => $val) {
+			$active_users_per_quarter[] = array($val[0]['DATE'] * 1000,  $val[0]["ACTIVEUSERS"]);
+		}
+		$this->set("active_users_per_quarter", $active_users_per_quarter);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, COUNT(distinct user_id) as ACTIVEUSERS from order_master where `is_deleted` = 'N' AND (`status` = 'VERIFIED' OR `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`i_date`))
+			");
+		$active_users_per_year = array();
+		foreach($temp_results as $key => $val) {
+			$active_users_per_year[] = array($val[0]['DATE'] * 1000, $val[0]["ACTIVEUSERS"]);
+		}
+		$this->set("active_users_per_year", $active_users_per_year);
+
+		$temp_results = $conn->fetchall("
+		SELECT REPLACE(`referal_source`,'www.','') AS SOURCE, COUNT(referal_source) AS CUSTOMERS FROM `user_master`  WHERE `verification_date` != '' GROUP BY REPLACE(`referal_source`,'www.','') ORDER BY customers DESC
+			");
+		$total_users_by_referal = array();
+		$total_users = 0;
+		foreach($temp_results as $key => $val) {
+			
+			if (preg_match("/(google|search|bing)/", $val[0]["SOURCE"]) && !preg_match("/google\|/", $val[0]["SOURCE"])) {
+				if (!isset($searchkey)) {
+						$searchkey = $key;
+						$total_users_by_referal[$searchkey]['Customers'] = 0;
+				$total_users_by_referal[$searchkey]['Source'] = "Search engines";
+				}
+				$total_users_by_referal[$searchkey]['Customers'] += $val[0]["CUSTOMERS"];
+
+			} elseif ($val[0]["SOURCE"] == '') {
+				
+				$total_users_by_referal[$key]['Customers'] = $val[0]["CUSTOMERS"];
+				$total_users_by_referal[$key]['Source'] = "Direct entry";
+			} else {
+				$total_users_by_referal[$key]['Customers'] = $val[0]["CUSTOMERS"];
+				$total_users_by_referal[$key]['Source'] = $val[0]["SOURCE"];
+
+			}
+			$total_users += $val[0]["CUSTOMERS"];
+		}
+		$this->set("total_users", $total_users);
+		$this->set("total_users_by_referal", $total_users_by_referal);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, ROUND(AVG(`order_amt`), 2) AS ORDERSIZE FROM `order_master` JOIN `restaurant_master` USING(`restaurant_id`) WHERE `order_master`.`is_deleted` = 'N' AND (`status` = 'VERIFIED' or `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`))
+			");
+
+		$ordersize_average_per_month = array();
+		$array_elements = -1;
+
+		foreach($temp_results as $key => $val) {
+			$ordersize_average_per_month[] = array($val[0]['DATE'] * 1000, $val[0]["ORDERSIZE"]);
+			$array_elements++;
+			
+		}
+
+		$this->set("ordersize_average_per_month", $ordersize_average_per_month);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, ROUND(AVG(`order_commission`*100), 2) AS COMMISSION FROM `order_master` JOIN `restaurant_master` USING(`restaurant_id`) WHERE `order_master`.`is_deleted` = 'N' AND (`status` = 'VERIFIED' or `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`))
+			");
+
+		$commission_average_per_month = array();
+		$array_elements = -1;
+
+		foreach($temp_results as $key => $val) {
+			$commission_average_per_month[] = array($val[0]['DATE'] * 1000, $val[0]["COMMISSION"]);
+			$array_elements++;
+			
+		}
+
+		$this->set("commission_average_per_month", $commission_average_per_month);
+
+		$temp_results = $conn->fetchall("
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(FROM_UNIXTIME(`order_master`.`i_date`), '%Y-%m-01')) AS DATE, ROUND(SUM(`order_commission`*100) / SUM(`order_amt`), 2) AS COMMISSION FROM `order_master` JOIN `restaurant_master` USING(`restaurant_id`) WHERE `order_master`.`is_deleted` = 'N' AND (`status` = 'VERIFIED' or `status` = 'REJECTED') GROUP BY YEAR(FROM_UNIXTIME(`order_master`.`i_date`)), MONTH(FROM_UNIXTIME(`order_master`.`i_date`))
+			");
+
+		$commission_percentage_per_month = array();
+		$array_elements = -1;
+
+		foreach($temp_results as $key => $val) {
+			$commission_percentage_per_month[] = array($val[0]['DATE'] * 1000, $val[0]["COMMISSION"]);
+			$array_elements++;
+			
+		}
+
+		$this->set("commission_percentage_per_month", $commission_percentage_per_month);
+
+
+		$temp_results = $conn->fetchall("
+		SELECT REPLACE(`referal_source`,'www.','') AS SOURCE, COUNT(referal_source) AS CUSTOMERS FROM `user_master` WHERE `verification_date` != '' AND `verification_date` > UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 30 DAY)) GROUP BY REPLACE(`referal_source`,'www.','') ORDER BY customers DESC
+			");
+		$recent_users_by_referal = array();
+		$recent_users = 0;
+		unset ($searchkey);
+		foreach($temp_results as $key => $val) {
+			
+			if (preg_match("/(google|search|bing)/", $val[0]["SOURCE"]) && !preg_match("/google\|/", $val[0]["SOURCE"])) {
+				if (!isset($searchkey)) {
+						$searchkey = $key;
+						$recent_users_by_referal[$searchkey]['Customers'] = 0;
+				$recent_users_by_referal[$searchkey]['Source'] = "Search engines";
+				}
+				$recent_users_by_referal[$searchkey]['Customers'] += $val[0]["CUSTOMERS"];
+
+			} elseif ($val[0]["SOURCE"] == '') {
+				
+				$recent_users_by_referal[$key]['Customers'] = $val[0]["CUSTOMERS"];
+				$recent_users_by_referal[$key]['Source'] = "Direct entry";
+			} else {
+				$recent_users_by_referal[$key]['Customers'] = $val[0]["CUSTOMERS"];
+				$recent_users_by_referal[$key]['Source'] = $val[0]["SOURCE"];
+
+			}
+			$recent_users += $val[0]["CUSTOMERS"];
+		}
+
+		$this->set("recent_users_by_referal", $recent_users_by_referal);
+		$this->set("recent_users", $recent_users);
+
+	}
+	
+	function admin_monthly_breakout() {
+
+		$this->admin_checkSession();
+
+		if (isset($this->data['report']['startdate'])) {
+			$startdate = $this->data['report']['startdate'];
+		} else {
+			$startdateobj = new DateTime();
+			$startdateobj->sub(new DateInterval('P29D'));
+			$startdate = $startdateobj->format('Y-m-d');
+		}
+		if (isset($this->data['report']['enddate'])) {
+			$enddate = $this->data['report']['enddate'];
+		} else {
+			$enddateobj = new DateTime();
+			$enddateobj->sub(new DateInterval('P1D'));
+			$enddate = $enddateobj->format('Y-m-d');
+		}
+
+		if (strtotime($startdate) >= strtotime($enddate)) {
+				$startdate = $enddate;
+		}
+
+		$this->set('startdate', $startdate);
+		$this->set('enddate', $enddate);
+
+		$db = ConnectionManager::getInstance();
+		$conn = $db->getDataSource('default');
+
+		$todaystats = $conn->fetchall("SELECT
+			`prefecture_detail`.`prefecture_name`,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), 1, 0)) AS verified_orders,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND `order_master`.`order_referal` = 'Android', 1, 0)) AS android_orders,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND `order_master`.`order_referal` = 'IOS', 1, 0)) AS ios_orders,
+			SUM(IF(`order_master`.`status` = 'CANCELED', 1, 0)) AS canceled_orders,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), `order_master`.`order_amt`, 0)) AS total_sales,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), `order_master`.`order_commission`, 0)) AS total_commissions,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 0 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 3, 1, 0)) AS 0_3,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 3 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 6, 1, 0)) AS 3_6,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 6 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 9, 1, 0)) AS 6_9,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 9 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 12, 1, 0)) AS 9_12,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 12 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 15, 1, 0)) AS 12_15,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 15 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 18, 1, 0)) AS 15_18,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 18 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 21, 1, 0)) AS 18_21,
+			SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 21 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 24, 1, 0)) AS 21_24
+			FROM `order_master`
+			JOIN `user_address`
+			ON (`user_address`.`address_id` = `order_master`.`deliveryaddress_id`)
+			JOIN `city_master`
+			USING (`city_id`)
+			JOIN `prefecture_detail`
+			ON (`prefecture_detail`.`prefecture_id` = `city_master`.`prefecture_id` AND `prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+			WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+			AND `order_master`.`is_deleted` = 'N'
+			GROUP BY `prefecture_detail`.`prefecture_id`
+			ORDER BY `prefecture_detail`.`prefecture_id`
+		");
+		//debug ($todaystats);
+		$this->set('todaystats', $todaystats);
+
+		$result = $conn->fetchall("
+		SELECT
+		`prefecture_detail`.`prefecture_name`,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), 1, 0)) AS lastweek_orders
+		FROM `order_master`
+		JOIN `user_address`
+		ON (`user_address`.`address_id` = `order_master`.`deliveryaddress_id`)
+		JOIN `city_master`
+		USING (`city_id`)
+		JOIN `prefecture_detail`
+		ON (`prefecture_detail`.`prefecture_id` = `city_master`.`prefecture_id` AND `prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 WEEK))
+		AND `order_master`.`i_date` <= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
+		AND `order_master`.`is_deleted` = 'N'
+		GROUP BY `prefecture_detail`.`prefecture_id`
+		ORDER BY `prefecture_detail`.`prefecture_id`
+		");
+
+		$todayotherstats = array();
+
+		foreach ($result as $row) {
+
+			$todayotherstats[$row['prefecture_detail']['prefecture_name']]['lastweek_orders'] = $row[0]['lastweek_orders'];
+
+		}
+
+		$result = $conn->fetchall("
+		SELECT
+		`prefecture_detail`.`prefecture_name`,
+		COUNT(DISTINCT `user_id`) AS verifications
+		FROM `user_master`
+		JOIN `user_address`
+		USING (`user_id`)
+		JOIN `city_master`
+		USING (`city_id`)
+		JOIN `prefecture_detail`
+		ON (`prefecture_detail`.`prefecture_id` = `city_master`.`prefecture_id` AND `prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+		AND `user_master`.`is_deleted` = 'N'
+		AND `user_address`.`is_default` = 'Y'
+		GROUP BY `prefecture_detail`.`prefecture_id`
+		");
+
+		foreach ($result as $row) {
+
+			$todayotherstats[$row['prefecture_detail']['prefecture_name']]['verifications'] = $row[0]['verifications'];
+
+		}
+
+		$result = $conn->fetchall("
+		SELECT
+		`prefecture_detail`.`prefecture_name`,
+		COUNT(DISTINCT `user_id`) AS registrations
+		FROM `user_master`
+		JOIN `user_address`
+		USING (`user_id`)
+		JOIN `city_master`
+		USING (`city_id`)
+		JOIN `prefecture_detail`
+		ON (`prefecture_detail`.`prefecture_id` = `city_master`.`prefecture_id` AND `prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+		AND `user_master`.`is_deleted` = 'N'
+		AND `user_address`.`is_default` = 'Y'
+		GROUP BY `prefecture_detail`.`prefecture_id`
+		");
+
+		foreach ($result as $row) {
+
+			$todayotherstats[$row['prefecture_detail']['prefecture_name']]['registrations'] = $row[0]['registrations'];
+
+		}
+
+
+
+		$this->set('todayotherstats', $todayotherstats);
+
+		$result = $conn->fetchall("
+		SELECT
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), 1, 0)) AS verified_orders,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND `order_master`.`order_referal` = 'Android', 1, 0)) AS android_orders,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND `order_master`.`order_referal` = 'IOS', 1, 0)) AS ios_orders,
+		SUM(IF(`order_master`.`status` = 'CANCELED', 1, 0)) AS canceled_orders,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), `order_master`.`order_amt`, 0)) AS total_sales,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), `order_master`.`order_commission`, 0)) AS total_commissions,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 0 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 3, 1, 0)) AS 0_3,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 3 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 6, 1, 0)) AS 3_6,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 6 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 9, 1, 0)) AS 6_9,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 9 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 12, 1, 0)) AS 9_12,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 12 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 15, 1, 0)) AS 12_15,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 15 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 18, 1, 0)) AS 15_18,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 18 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 21, 1, 0)) AS 18_21,
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED') AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) >= 21 AND HOUR(FROM_UNIXTIME(`order_master`.`i_date`)) < 24, 1, 0)) AS 21_24
+		FROM `order_master`
+		WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+		AND `order_master`.`is_deleted` = 'N'
+
+		");
+		#debug($result);
+		$todaytotalstats = $result[0][0];
+
+		$result = $conn->fetchall("
+		SELECT
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), 1, 0)) AS lastweek_orders
+		FROM `order_master`
+		WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 WEEK))
+		AND `order_master`.`i_date` <= UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 1 WEEK))
+		AND `order_master`.`is_deleted` = 'N'
+		");
+
+		$todaytotalstats['lastweek_orders'] = $result[0][0]['lastweek_orders'];
+
+		$result = $conn->fetchall("
+		SELECT
+		SUM(IF(`order_master`.`status` IN ('VERIFIED','REJECTED'), 1, 0)) AS lastweek_total_orders
+		FROM `order_master`
+		WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 1 WEEK))
+		AND `order_master`.`i_date` < UNIX_TIMESTAMP(DATE_SUB(CURDATE(), INTERVAL 6 DAY))
+		AND `order_master`.`is_deleted` = 'N'
+		");
+
+		$todaytotalstats['lastweek_total_orders'] = $result[0][0]['lastweek_total_orders'];
+		#debug($todaytotalstats['lastweek_total_orders']);
+
+		$result = $conn->fetchall("
+		SELECT
+		COUNT(DISTINCT `user_id`) AS verifications
+		FROM `user_master`
+		WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+		AND `user_master`.`is_deleted` = 'N'
+		");
+
+		$todaytotalstats['verifications'] = $result[0][0]['verifications'];
+
+		$result = $conn->fetchall("
+		SELECT
+		COUNT(DISTINCT `user_id`) AS registrations
+		FROM `user_master`
+		WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP(DATE(NOW()))
+		AND `user_master`.`is_deleted` = 'N'
+		");
+
+		$todaytotalstats['registrations'] = $result[0][0]['registrations'];
+
+		//debug ($todaytotalstats);
+		$this->set('todaytotalstats', $todaytotalstats);
+
+		$orderstats = $conn->fetchall("
+		SELECT `date`, `prefecture_name`, `verified_orders`, `android_orders`, `ios_orders`, `canceled_orders`, `registrations`, `verifications`, `total_sales`, `total_commissions`,
+		`0_3`, `3_6`, `6_9`, `9_12`, `12_15`, `15_18`, `18_21`, `21_24`, `thisyear_orders`, `lastyear_orders`
+		FROM `stats`
+		JOIN `prefecture_detail`
+		USING (`prefecture_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		AND `prefecture_id` != 0
+		AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		ORDER BY `prefecture_id` ASC, `date` DESC 
+		");
+
+		$prefecturetotalstats = array();
+
+		$result = $conn->fetchall("
+		SELECT `prefecture_name`, SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `stats`
+		JOIN `prefecture_detail`
+		USING (`prefecture_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		AND `prefecture_id` != 0
+		AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		GROUP BY `prefecture_id`
+		ORDER BY `prefecture_id` ASC, `date` DESC 
+		");
+
+		foreach ($result as $row) {
+			$prefecturetotalstats[$row['prefecture_detail']['prefecture_name']] = $row[0];
+		}
+
+		$result = $conn->fetchall("
+		SELECT `date`, SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `stats`
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		GROUP BY `date`
+		ORDER BY `date` DESC 
+		");
+
+		$totalstats = array();
+		foreach ($result as $row) {
+			$totalstats[] = array(
+						'stats' => array_merge($row['stats'], $row[0]),
+						'prefecture_detail' => array('prefecture_name' => 'Total')
+			);
+		}
+
+		$orderstats = array_merge ($totalstats, $orderstats);
+
+		$result = $conn->fetchall("
+		SELECT SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `stats`
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		");
+
+		$prefecturetotalstats['Total'] = $result[0][0];
+
+		//debug ($orderstats);
+		//debug ($prefecturetotalstats);
+		$this->set("orderstats", $orderstats);
+		$this->set("prefecturetotalstats", $prefecturetotalstats);
+	}
+
+	function admin_monthly_breakout_city() {
+		$this->admin_checkSession();
+
+		if (isset($this->data['report']['startdate'])) {
+			$startdate = $this->data['report']['startdate'];
+		} else {
+			$startdateobj = new DateTime();
+			$startdateobj->sub(new DateInterval('P29D'));
+			$startdate = $startdateobj->format('Y-m-d');
+		}
+		if (isset($this->data['report']['enddate'])) {
+			$enddate = $this->data['report']['enddate'];
+		} else {
+			$enddateobj = new DateTime();
+			$enddateobj->sub(new DateInterval('P1D'));
+			$enddate = $enddateobj->format('Y-m-d');
+		}
+
+		if (strtotime($startdate) >= strtotime($enddate)) {
+			$startdate = $enddate;
+		}
+
+		$this->set(array(
+			'startdate' => $startdate,
+			'enddate' => $enddate
+		));
+
+		$temp_city_account_managers = $this->user->find("all", array(
+			"recursive" => -1,
+			"fields" => array("user.user_id", "user.last_name", "citydetail.city_name"),
+			"joins" => array(
+				array(
+					"table" => "city_master",
+					"alias" => "city",
+					"type" => "INNER",
+					"conditions" => array(
+						"city.city_account_manager_id = user.user_id"
+					)
+				),
+				array(
+					"table" => "city_detail",
+					"alias" => "citydetail",
+					"type" => "INNER",
+					"conditions" => array(
+						"citydetail.city_id = city.city_id"
+					)
+				)
+			),
+			"conditions" => array(
+				"citydetail.language_id" => $this->Session->read('SS_LANGUAGEID')
+			)
+		));
+
+		$city_account_managers = Set::combine($temp_city_account_managers, '{n}.citydetail.city_name', '{n}.user.last_name');
+		$account_managers = Set::combine($temp_city_account_managers, '{n}.user.user_id', '{n}.user.last_name');
+
+		if (!empty($this->data['report']['account_manager'])) {
+			$account_manager = $this->data['report']['account_manager'];
+		}
+		elseif (!empty($this->params['named']['account_manager'])) {
+			$account_manager = $this->params['named']['account_manager'];
+		}
+		else {
+			$account_manager = null;
+		}
+
+		if (isset($account_managers[$this->Session->read('SS_CAKEPHP_ADMINID')])) {
+			// User is an account manager, apply his user_id as account_manager filter
+			$account_manager = $this->Session->read('SS_CAKEPHP_ADMINID');
+		}
+
+		$this->set('city_account_managers', $city_account_managers);
+		$this->set('account_managers', $account_managers);
+		$this->set('account_manager', $account_manager);
+
+		$db = ConnectionManager::getInstance();
+		$conn = $db->getDataSource('default');
+
+		$citytotalstats = array();
+		$result = $conn->fetchall("SELECT `prefecture_name`, `city_detail`.`city_name`, SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+			SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+			FROM `city_stats`
+			JOIN `prefecture_detail`
+			USING (`prefecture_id`)
+			JOIN `city_detail`
+			USING (`city_id`)
+			WHERE `date` >= '".$startdate."'
+			AND `date` <= '".$enddate."'
+			AND `prefecture_id` != 0
+			AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+			AND (`city_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+			GROUP BY `city_id`
+			ORDER BY `prefecture_id` ASC, `city_name` ASC, `date` DESC 
+		");
+
+		foreach ($result as $row) {
+			$citytotalstats[$row['city_detail']['city_name']] = $row[0];
+		}
+
+		$result = $conn->fetchall("SELECT SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+			SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+			FROM `city_stats`
+			WHERE `date` >= '".$startdate."'
+			AND `date` <= '".$enddate."'
+		");
+
+		$citytotalstats['Total'] = $result[0][0];
+
+		$extra_conditions = array();
+
+		if (isset($account_manager)) {
+			$extra_conditions[] = "AND city_master.city_account_manager_id = ".$account_manager;
+		}
+		$temp_orderstats = $conn->fetchall("SELECT `date`, `prefecture_name`, `city_id`, `city_name`, `city_account_manager_id`, `verified_orders`, `android_orders`, `ios_orders`, `canceled_orders`, `registrations`, `verifications`, `total_sales`, `total_commissions`,
+			`0_3`, `3_6`, `6_9`, `9_12`, `12_15`, `15_18`, `18_21`, `21_24`, `thisyear_orders`, `lastyear_orders`
+			FROM `city_stats`
+			JOIN `prefecture_detail`
+			USING (`prefecture_id`)
+			JOIN `city_master`
+			USING (`city_id`)
+			JOIN `city_detail`
+			USING (`city_id`)
+			WHERE `date` >= '".$startdate."'
+			AND `date` <= '".$enddate."'
+			AND `prefecture_detail`.`prefecture_id` != 0
+			AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+			AND (`city_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').") ".implode(" ", $extra_conditions)
+			." ORDER BY `prefecture_detail`.`prefecture_id` ASC, `city_name` ASC, `date` DESC 
+		");
+
+		$orderstats = array();
+		foreach ($temp_orderstats as $key => $stat) {
+			if (!isset($orderstats[$stat['city_detail']['city_name']])) {
+				$orderstats[$stat['city_detail']['city_name']] = array();
+			}
+			$orderstats[$stat['city_detail']['city_name']][$stat['city_stats']['date']] = $stat;
+		}
+
+		$this->set(array(
+			'orderstats' => $orderstats,
+			'citytotalstats' => $citytotalstats
+		));
+	}
+
+	function admin_custom_stats () {
+		$this->admin_checkSession();
+		$restaurant_ids = $this->getRestaurantIds();
+		$this->custom_stats_queries['restaurant_item_sales']['placeholders'][':restaurant_id']['values'] = $restaurant_ids;
+		$this->custom_stats_queries['chain_item_sales']['placeholders'][':restaurant_group_id']['values'] = $this->getRestaurantGroupIds();
+
+		$queries = array();
+		foreach ($this->custom_stats_queries as $query_key => $query) {
+			$queries[$query_key] = array(
+				"label" => Inflector::humanize($query_key),
+				"placeholders" => isset($query['placeholders'])?$query['placeholders']:array()
+			);
+			if (!isset($query_labels[$query['group']])) {
+				$query_labels[$query['group']] = array();
+			}
+			$query_labels[$query['group']][$query_key] = $queries[$query_key]['label'];
+			// $query_labels[$query_key] = $queries[$query_key]['label'];
+		}
+		#Humanize group names
+	    $human_labels = array();
+	    foreach ($query_labels as $key => $value) {
+	    	$human_labels[Inflector::humanize($key)] = $value;
+	    }
+		$this->set("queries", $queries);
+		$this->set("query_labels", $human_labels);
+	}
+
+	function admin_generate_excel() {
+		// debug( $this->data );
+		$this->autoRender = false;
+		$this->admin_checkSession();
+
+		$temp_results = $this->execute_query();
+
+		$arrayForExcel = $this->generateExcelArray($temp_results);
+		if( empty($arrayForExcel) ) {
+			$this->Session->write("ERROR_MESSAGE", __("Empty result set", true));
+			$this->redirect($this->referer());
+		}
+
+		App::import('Vendor', 'PHPExcel', array('file' => 'phpExcel'.DS.'PHPExcel.php'));
+
+		// Create new PHPExcel object
+		$objPHPExcel = new PHPExcel();
+		$objWorksheet = $objPHPExcel->getActiveSheet();
+		$objWorksheet->fromArray($arrayForExcel);
+
+		$style['header'] = array(
+			'font' => array(
+				'name' => 'Arial',
+				'bold' => true
+			),
+			'fill' => array(
+				'type' => PHPExcel_Style_Fill::FILL_SOLID,
+				'color' => array(
+					'rgb' => 'C0C0C0'
+				)
+			),
+			'alignment' => array(
+				'wrap'       => true,
+				'horizontal' => PHPExcel_Style_Alignment::HORIZONTAL_CENTER,
+				'vertical' => PHPExcel_Style_Alignment::VERTICAL_CENTER
+			)
+		);
+		
+		for ( $i=0; $i<count($arrayForExcel[0]); $i++ ) {
+			$col = PHPExcel_Cell::stringFromColumnIndex($i);
+			// Set column width to autosize
+			$objWorksheet->getColumnDimension($col)->setAutoSize(true);
+
+			$objWorksheet->getStyleByColumnAndRow($i, 1)->applyFromArray($style['header']);
+		}
+		$objWorksheet->calculateColumnWidths();
+
+		$objWorksheet->getDefaultRowDimension()->setRowHeight(20);
+
+		// Redirect output to a client's web browser (Excel5)
+		header('Content-Type: application/vnd.ms-excel');
+		header('Content-Disposition: attachment;filename="'.$this->data['report']['query'].'.xls"');
+		header('Cache-Control: max-age=0');
+		// If you're serving to IE 9, then the following may be needed
+		header('Cache-Control: max-age=1');
+
+		// If you're serving to IE over SSL, then the following may be needed
+		header ('Expires: Mon, 26 Jul 1997 05:00:00 GMT'); // Date in the past
+		header ('Last-Modified: '.gmdate('D, d M Y H:i:s').' GMT'); // always modified
+		header ('Cache-Control: cache, must-revalidate'); // HTTP/1.1
+		header ('Pragma: public'); // HTTP/1.0
+
+		$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+		$objWriter->save('php://output');
+	}
+
+	function admin_get_query_results() {
+		$this->admin_checkSession();
+		$temp_results = $this->execute_query();
+
+		if ( count($temp_results) <= 0 ){
+			$result = array();
+		} else {
+			$result = array(
+				"headers" => array(),
+				"types" => array(),
+				"rows" => array()
+			);
+
+			# Set up the headers from the result keys
+			foreach ($temp_results[0] as $key => $value) {
+				$result["headers"] = array_merge($result["headers"], array_keys($value));
+				foreach ($value as $headerValue) {
+					$result["types"][] = (is_numeric($headerValue))?"numeric":"text";
+				}
+			}
+
+			# Set up the rows from the result values
+			for ($i=0;$i<count($temp_results);$i++) {
+				$result["rows"][] = array();
+				foreach ($temp_results[$i] as $key => $value) {
+					foreach ($value as $key_row => $value_row) {
+						$result["rows"][$i][] = $value_row;
+					}
+				}
+			}
+		}
+		$this->set("data", $result);
+	}
+
+	function admin_clientapp_dump() {
+		$this->admin_checkSession();
+
+		if (isset($this->params['named']['start'])) {
+			$startdate = $this->params['named']['start'];
+		}
+		else if (isset($this->data['filter']['startdate'])) {
+			$startdate = $this->data['filter']['startdate'];
+		} else {
+			$startdateobj = new DateTime();
+			$startdateobj->sub(new DateInterval('P29D'));
+			$startdate = $startdateobj->format('Y-m-d');
+		}
+		if (isset($this->params['named']['end'])) {
+			$enddate = $this->params['named']['end'];
+		}
+		else if (isset($this->data['filter']['enddate'])) {
+			$enddate = $this->data['filter']['enddate'];
+		} else {
+			$enddateobj = new DateTime();
+			$enddate = $enddateobj->format('Y-m-d');
+		}
+
+		if (strtotime($startdate) >= strtotime($enddate)) {
+				$startdate = $enddate;
+		}
+
+
+		if (isset($this->params['named']['user']) && trim($this->params['named']['user']) != "") {
+			$user_id = $this->params['named']['user'];
+		}
+		else if (isset($this->data['filter']['user_id']) && trim($this->data['filter']['user_id']) != "") {
+			$user_id = $this->data['filter']['user_id'];
+		}
+
+		$this->set('startdate', $startdate);
+		$this->set('enddate', $enddate);
+		if (isset($user_id)) {
+			$this->set('user_id', $user_id);
+		}
+
+		$version_data = $this->user->find("all", array(
+			"recursive" => -1,
+			"fields" => array("user.clientapp_version", "COUNT(*) AS count"),
+			"joins" => array(
+				array(
+					"table" => "restaurant_master",
+					"alias" => "restaurant",
+					"type" => "LEFT",
+					"conditions" => array(
+						"user.user_id = restaurant.user_id"
+					)
+				)
+			),
+			"conditions" => array(
+				"user.usertype_id" => 2,
+				"user.is_active" => "Y",
+				"user.is_deleted" => "N",
+				"restaurant.is_active" =>"Y",
+				"restaurant.is_deleted" => "N",
+				"restaurant.polling" => 1,
+				"restaurant.restaurant_id != 387"
+			),
+			"group" => "user.clientapp_version",
+			"order" => "user.clientapp_version DESC"
+		));
+		$this->set('version_data', $version_data);
+
+		$temp_restaurant_versions = $this->user->find("all", array(
+			"fields" => array(
+				"user.user_id", "user.email_id", "user.clientapp_version", "restaurant.restaurant_id", "restaurant.restaurant_shortname", "restaurant.phone"
+			),
+			"joins" => array(
+				array(
+					"table" => "restaurant_master",
+					"alias" => "restaurant",
+					"type" => "LEFT",
+					"conditions" => array(
+						"user.user_id = restaurant.user_id"
+					)
+				)
+			),
+			"conditions" => array(
+				"user.clientapp_version != ''",
+				"user.is_active" => "Y",
+				"user.is_deleted" => "N",
+				"restaurant.is_active" =>"Y",
+				"restaurant.is_deleted" => "N",
+				"restaurant.polling" => 1,
+				"restaurant.restaurant_id != 387"
+			),
+			"order" => "user.clientapp_version DESC"
+		));
+		$restaurant_versions = array();
+		foreach ($temp_restaurant_versions as $key => $value) {
+			if (!isset($restaurant_versions[$value['user']['clientapp_version']])) {
+				$restaurant_versions[$value['user']['clientapp_version']] = array();
+			}
+			$restaurant_versions[$value['user']['clientapp_version']][] = $value;
+		}
+		$this->set('restaurant_versions', $restaurant_versions);
+
+		$user_data = $this->user->find("list", array(
+			"fields" => array("user.user_id", "user.email_id"),
+			"conditions" => array(
+				"user.usertype_id = 2",
+				"user.is_active" => "Y",
+				"user.is_deleted" => "N"
+			),
+			"order" => "user.email_id ASC"
+		));
+		$this->set("user_data", $user_data);
+
+		$conditions = array(
+			"clientappdump.i_date >=" => strtotime($startdate),
+			"clientappdump.i_date <" => strtotime($enddate) + 86400
+		);
+
+		if (isset($user_id)) {
+			$conditions["clientappdump.user_id"] = $user_id;
+		}
+
+		if (!empty($this->data['filter']['version'])) {
+			$conditions['clientappdump.version LIKE'] = "%".$this->data['filter']['version']."%";
+			$this->set('version', $this->data['filter']['version']);
+		}
+		else if (!empty($this->params['named']['version'])) {
+			$conditions['clientappdump.version LIKE'] = "%".$this->params['named']['version']."%";
+			$this->set('version', $this->params['named']['version']);
+		}
+
+		$this->paginate['recursive'] = -1;
+		$this->paginate['limit'] = 20;
+		$this->paginate['order'] = array("clientappdump.i_date DESC");
+		$data = $this->paginate('clientappdump', $conditions);
+		$this->set('data', $data);
+		$this->set('url', $this->Filter->url);
+	}
+
+	private function execute_query() {
+		$query_key = $this->data['report']['query'];
+		if ( isset($this->custom_stats_queries[$query_key]) ) {
+			$query = $this->custom_stats_queries[$query_key]['query'];
+
+			if ($query_key == "coupon_stats" && $this->data['coupon_code'] == "" ) {
+				$query = "SELECT LEFT(`promo_id`, 3) AS COUPON_SERIES, description AS DESCRIPTION, COUNT(*) AS ISSUED_COUPONS FROM `user_promos` GROUP BY COUPON_SERIES ORDER BY i_date DESC";
+			}
+			else {
+				foreach ($this->custom_stats_queries[$query_key]["placeholders"] as $key => $placeholder) {
+					if ( $key == ":lang" ) {
+						$query = str_replace($key, $this->Session->read('SS_LANGUAGEID'), $query);
+					}
+					else {
+						if ( isset($this->data[$placeholder['id']]) ) {
+							// debug($key);
+							if ( $placeholder['type'] == Placeholders::Date ) {
+								$query = str_replace($key, "FROM_UNIXTIME(".$this->data[$placeholder['id']].", '%Y-%m-%d')", $query);
+							}
+							else if ( $placeholder['type'] == Placeholders::Year_Month ) {
+								$year = $this->data[$placeholder['id']]['year'];
+								$month = $this->data[$placeholder['id']]['month'];
+								$query = str_replace($key, "'".$year."-".$month."-01'", $query);
+							}
+							else if ( $placeholder['type'] == Placeholders::Year ) {
+								$year = $this->data[$placeholder['id']]['year'];
+								$query = str_replace($key, "'".$year."-01-01'", $query);
+							}
+							else if ( $placeholder['type'] == Placeholders::Strings) {
+								$like_conditions = array();
+								$strings = explode("|", $this->data[$placeholder['id']]);
+								foreach ($strings as $str) {
+									$like_conditions[] = $placeholder['attribute']." LIKE '".$str."'";
+								}
+
+								$query = str_replace($key, implode(" OR ", $like_conditions), $query);
+							}
+							else {
+								$query = str_replace($key, $this->data[$placeholder['id']], $query);
+							}
+						}
+						else {
+							$this->Session->write("ERROR_MESSAGE", __("Missing value for: ", true).$placeholder['id']);
+							$this->redirect($this->referer());
+						}
+						// debug($query);
+					}
+				}
+			}
+			// debug($query);
+			// debug($this->data);
+			
+			$db = ConnectionManager::getInstance();
+			$conn = $db->getDataSource('default');
+
+			return $conn->fetchall($query);
+		}
+		else {
+			$this->Session->write("ERROR_MESSAGE", __("No or invalid query provided", true));
+			$this->redirect($this->referer());
+		}
+	}
+
+	private function generateExcelArray( $data ) {
+		if ( count($data) <= 0 ) return array();
+
+		$result = array(
+			array()
+		);
+		foreach ($data[0] as $key => $value) {
+			$result[0] = array_merge($result[0], array_keys($value));
+		}
+		for ($i=0;$i<count($data);$i++) {
+			$result[] = array();
+			foreach ($data[$i] as $key => $value) {
+				foreach ($value as $key_row => $value_row) {
+					$result[$i+1][] = $value_row;
+				}
+			}
+		}
+		return $result;
+	}
+
+	private function getRestaurantIds() {
+		$db = ConnectionManager::getInstance();
+		$conn = $db->getDataSource('default');
+
+		$temp_results = $conn->fetchall("SELECT restaurant_id,restaurant_shortname FROM restaurant_master WHERE is_deleted='N' AND restaurant_id != 19");
+
+		$results = array();
+
+		foreach ($temp_results as $key => $value) {
+			$results[$temp_results[$key]['restaurant_master']['restaurant_id']] = $temp_results[$key]['restaurant_master']['restaurant_shortname'];
+		}
+		return $results;
+	}
+
+	private function getRestaurantGroupIds() {
+		$db = ConnectionManager::getInstance();
+		$conn = $db->getDataSource('default');
+
+		$temp_results = $conn->fetchall("SELECT restaurantgroup_id,restaurantgroup_shortname FROM restaurantgroup");
+
+		$results = array();
+
+		foreach ($temp_results as $key => $value) {
+			$results[$temp_results[$key]['restaurantgroup']['restaurantgroup_id']] = $temp_results[$key]['restaurantgroup']['restaurantgroup_shortname'];
+		}
+		return $results;
+	}
+}
+
+
+abstract class Placeholders {
+	const Date = 1;
+	const Timestamp = 2;
+	const Year = 3;
+	const Year_Month = 4;
+	const Numeric = 5;
+	const Str = 6;
+	const Strings = 7;
+}
+
+?>
