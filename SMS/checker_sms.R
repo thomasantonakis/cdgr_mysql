@@ -49,4 +49,5 @@ dbDisconnect(con)
 proc.time() - ptm
 
 successes<-merge(received, verified)
-dim(successes)
+max(dim(successes))
+round(max(dim(successes))/max(dim(received))*100,2)
