@@ -95,6 +95,6 @@ plot(table(peruser$distinct_ord), main="Distinct Orders February", type= 'b', lw
 plot(table(peruser$distinct_add), main="Distinct Addresses February", type= 'b', lwd = 5, col = 'darkslateblue', 
      xlab="Distinct Addresses", ylab = "NUmber of Users")
 
-write.xlsx(x=peruser, file = 'peruser.xlsx', row.names = FALSE)
+# write.xlsx(x=peruser, file = 'peruser.xlsx', row.names = FALSE)
 # Stop timer
 proc.time() - ptm
