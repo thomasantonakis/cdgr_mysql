@@ -1190,6 +1190,7 @@ company$monthofyear<-paste(company$year,company$monthofyear, sep="")
 
 orders<-ddply(company,c("PREFECTURE","monthofyear"), summarize, orders=sum(ORDERS)) %>% spread(monthofyear, orders)
 orders[is.na(orders)]<-0
+orders$type<-"company"
 # orders$metric<-"orders"
 # orders<-orders[,c(1, ncol(orders), 2:(ncol(orders)-1))]
 
@@ -1201,6 +1202,7 @@ orders[is.na(orders)]<-0
 
 revenue<-ddply(company,c("PREFECTURE","monthofyear"), summarize, revenue=sum(ORDERSUM)) %>% spread(monthofyear, revenue)
 revenue[is.na(revenue)]<-0
+revenue$type<-"company"
 # revenue$metric<-"revenue"
 # revenue<-revenue[,c(1, ncol(revenue), 2:(ncol(revenue)-1))]
 
@@ -1212,6 +1214,7 @@ revenue[is.na(revenue)]<-0
 
 commission<-ddply(company,c("PREFECTURE","monthofyear"), summarize, commission=sum(RESTAURANT_COMMISSION)) %>% spread(monthofyear, commission)
 commission[is.na(commission)]<-0
+commission$type<-"company"
 # commission$metric<-"commission"
 # commission<-commission[,c(1, ncol(commission), 2:(ncol(commission)-1))]
 
@@ -1229,6 +1232,7 @@ restaurants<-as.data.frame(table(company$PREFECTURE, company$monthofyear, useNA=
 names(restaurants)[1]<-"PREFECTURE"
 # Add for Pizza Fan 60 restaurants
 restaurants[is.na(restaurants$PREFECTURE),2:ncol(restaurants)]<-restaurants[is.na(restaurants$PREFECTURE),2:ncol(restaurants)]+60
+restaurants$type<-"company"
 # restaurants$metric<-"restaurants"
 # restaurants<-restaurants[,c(1, ncol(restaurants), 2:(ncol(restaurants)-1))]
 
@@ -1243,23 +1247,27 @@ chain$monthofyear<-paste(chain$year,chain$monthofyear, sep="")
 
 chain_ord<-select(chain,CHAIN_ID,monthofyear, ORDERS)   %>% spread(monthofyear, ORDERS)
 chain_ord[is.na(chain_ord)]<-0
+chain_ord$type<-"chain"
 names(chain_ord)[1]<-"PREFECTURE"
-chain_ord<-chain_ord[,c(2:ncol(chain_ord), 1)]
+chain_ord<-chain_ord[,c(2:(ncol(chain_ord)-1), 1, ncol(chain_ord))]
 
 chain_sal<-select(chain,CHAIN_ID,monthofyear, ORDERSUM)   %>% spread(monthofyear, ORDERSUM)
 chain_sal[is.na(chain_sal)]<-0
+chain_sal$type<-"chain"
 names(chain_sal)[1]<-"PREFECTURE"
-chain_sal<-chain_sal[,c(2:ncol(chain_sal), 1)]
+chain_sal<-chain_sal[,c(2:(ncol(chain_sal)-1), 1, ncol(chain_sal))]
 
 chain_com<-select(chain,CHAIN_ID,monthofyear, RESTAURANT_COMMISSION)   %>% spread(monthofyear, RESTAURANT_COMMISSION)
 chain_com[is.na(chain_com)]<-0
+chain_com$type<-"chain"
 names(chain_com)[1]<-"PREFECTURE"
-chain_com<-chain_com[,c(2:ncol(chain_com), 1)]
+chain_com<-chain_com[,c(2:(ncol(chain_com)-1), 1, ncol(chain_com))]
 
 chain_res<-as.data.frame(table(chains_analytic$CHAIN_ID,chains_analytic$monthofyear ))
 names(chain_res)<-c("PREFECTURE", "monthofyear", "num")
 chain_res<-chain_res %>% spread(monthofyear, num)
-chain_res<-chain_res[,c(2:ncol(chain_res), 1)]
+chain_res$type<-"chain"
+chain_res<-chain_res[,c(2:(ncol(chain_res)-1), 1, ncol(chain_res))]
 
 orders<-rbind(orders, chain_ord)
 orders$metric<-"orders"
@@ -1275,11 +1283,11 @@ restaurants$metric<-"restaurants"
 # commission<-commission[,c((ncol(commission)-1):ncol(commission), 1:(ncol(commission)-2))]
 # restaurants<-restaurants[,c(1, ncol(restaurants), 2:(ncol(restaurants)-1))]
 # Add on Pizza Fan 60 restaurants
-restaurants[restaurants$PREFECTURE==41 & !is.na(restaurants$PREFECTURE),2:(ncol(restaurants)-1)]<-
-        restaurants[restaurants$PREFECTURE==41 & !is.na(restaurants$PREFECTURE),2:(ncol(restaurants)-1)]+60
+restaurants[restaurants$PREFECTURE==41 & !is.na(restaurants$PREFECTURE),2:(ncol(restaurants)-2)]<-
+        restaurants[restaurants$PREFECTURE==41 & !is.na(restaurants$PREFECTURE),2:(ncol(restaurants)-2)]+60
 
 report<-rbind(orders, revenue, commission, restaurants)
-report<-report[,c(1, ncol(report), 2:(ncol(report)-1))]
+report<-report[,c(1, (ncol(report)-1):ncol(report), 2:(ncol(report)-2))]
 
 #Export
 write.xlsx(x=report, file="chain2.xlsx", sheetName = "Data", row.names=FALSE)
