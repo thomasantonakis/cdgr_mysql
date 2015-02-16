@@ -1245,29 +1245,50 @@ chain$monthofyear<-chain$month
 chain$monthofyear[chain$month<10]<-paste("0",chain$month[chain$month<10], sep="")
 chain$monthofyear<-paste(chain$year,chain$monthofyear, sep="")
 
-chain_ord<-select(chain,CHAIN_ID,monthofyear, ORDERS)   %>% spread(monthofyear, ORDERS)
+# chain_ord<-select(chain,CHAIN_ID,monthofyear, ORDERS)   %>% spread(monthofyear, ORDERS)
+# chain_ord[is.na(chain_ord)]<-0
+# chain_ord$type<-"chain"
+# names(chain_ord)[1]<-"PREFECTURE"
+# chain_ord<-chain_ord[,c(2:(ncol(chain_ord)-1), 1, ncol(chain_ord))]
+
+chain_ord<-ddply(chains_analytic,c("PREFECTURE","CHAIN_ID","monthofyear"), summarize, orders=sum(ORDERS)) %>% spread(monthofyear, orders)
 chain_ord[is.na(chain_ord)]<-0
-chain_ord$type<-"chain"
-names(chain_ord)[1]<-"PREFECTURE"
-chain_ord<-chain_ord[,c(2:(ncol(chain_ord)-1), 1, ncol(chain_ord))]
+names(chain_ord)[2]<-"type"
+# chain_ord$metric<-"orders"
 
-chain_sal<-select(chain,CHAIN_ID,monthofyear, ORDERSUM)   %>% spread(monthofyear, ORDERSUM)
+
+# chain_sal<-select(chain,CHAIN_ID,monthofyear, ORDERSUM)   %>% spread(monthofyear, ORDERSUM)
+# chain_sal[is.na(chain_sal)]<-0
+# chain_sal$type<-"chain"
+# names(chain_sal)[1]<-"PREFECTURE"
+# chain_sal<-chain_sal[,c(2:(ncol(chain_sal)-1), 1, ncol(chain_sal))]
+
+chain_sal<-ddply(chains_analytic,c("PREFECTURE","CHAIN_ID","monthofyear"), summarize, orders=sum(ORDERSUM)) %>% spread(monthofyear, orders)
 chain_sal[is.na(chain_sal)]<-0
-chain_sal$type<-"chain"
-names(chain_sal)[1]<-"PREFECTURE"
-chain_sal<-chain_sal[,c(2:(ncol(chain_sal)-1), 1, ncol(chain_sal))]
+names(chain_sal)[2]<-"type"
+# chain_sal$metric<-"revenue"
 
-chain_com<-select(chain,CHAIN_ID,monthofyear, RESTAURANT_COMMISSION)   %>% spread(monthofyear, RESTAURANT_COMMISSION)
+# chain_com<-select(chain,CHAIN_ID,monthofyear, RESTAURANT_COMMISSION)   %>% spread(monthofyear, RESTAURANT_COMMISSION)
+# chain_com[is.na(chain_com)]<-0
+# chain_com$type<-"chain"
+# names(chain_com)[1]<-"PREFECTURE"
+# chain_com<-chain_com[,c(2:(ncol(chain_com)-1), 1, ncol(chain_com))]
+
+chain_com<-ddply(chains_analytic,c("PREFECTURE","CHAIN_ID","monthofyear"), summarize, orders=sum(RESTAURANT_COMMISSION)) %>% spread(monthofyear, orders)
 chain_com[is.na(chain_com)]<-0
-chain_com$type<-"chain"
-names(chain_com)[1]<-"PREFECTURE"
-chain_com<-chain_com[,c(2:(ncol(chain_com)-1), 1, ncol(chain_com))]
+names(chain_com)[2]<-"type"
+# chain_com$metric<-"revenue"
 
-chain_res<-as.data.frame(table(chains_analytic$CHAIN_ID,chains_analytic$monthofyear ))
-names(chain_res)<-c("PREFECTURE", "monthofyear", "num")
+# chain_res<-as.data.frame(table(chains_analytic$CHAIN_ID,chains_analytic$monthofyear ))
+# names(chain_res)<-c("PREFECTURE", "monthofyear", "num")
+# chain_res<-chain_res %>% spread(monthofyear, num)
+# chain_res$type<-"chain"
+# chain_res<-chain_res[,c(2:(ncol(chain_res)-1), 1, ncol(chain_res))]
+
+chain_res<-as.data.frame(table(chains_analytic$CHAIN_ID, chains_analytic$PREFECTURE, chains_analytic$monthofyear ))
+names(chain_res)<-c("type", "PREFECTURE", "monthofyear", "num")
 chain_res<-chain_res %>% spread(monthofyear, num)
-chain_res$type<-"chain"
-chain_res<-chain_res[,c(2:(ncol(chain_res)-1), 1, ncol(chain_res))]
+
 
 orders<-rbind(orders, chain_ord)
 orders$metric<-"orders"
