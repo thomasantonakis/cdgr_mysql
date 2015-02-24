@@ -12,7 +12,7 @@ ptm <- proc.time()
 # Read new data every day or week and incorporate to orders
 
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -38,7 +38,7 @@ rs <- dbSendQuery(con,"
                   ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = 1)
                   
                   
-                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-17')
+                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-19')
                   and ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
                   and  `restaurant_detail`.`language_id` = 1
                   
@@ -63,17 +63,15 @@ ord_user<-as.data.frame(table(orders$user_id))
 names(ord_user)<-c("user_id", "orders")
 ord_user$user_id<-as.numeric(as.character(ord_user$user_id))
 ord_user<-arrange(ord_user, desc(orders))
-
+gc()
 lod<-ddply(orders,("user_id"), summarize, last_ord_date=max(as.Date(order_date)))
 lod$user_id<-as.numeric(lod$user_id)
 
 ord_user<-merge(ord_user, lod)
 
-# Save workspace environment
-save.image("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Orders_form_2014.RData")
 
 rm(lod, new_orders)
-
+gc()
 # Segmentation for how long since last order
 ord_user$days_idle<-as.Date(as.character(Sys.time(),format="%Y-%m-%d"))-as.Date(as.character(ord_user$last_ord_date,format="%Y-%m-%d"))
 group <- cut(as.numeric(ord_user$days_idle), c(0,30, 60, 90, 120, 150, 180, Inf), right=FALSE)
@@ -82,6 +80,15 @@ ord_user$grp_idle <- group
 barplot(table(ord_user$grp_idle), main="How long ago was your last order?", xlab="Days",
         names.arg=c("Less than 30 days", "1-2 months", "2-3 months", "3-4 months", "4-5 months", "5-6 months", "More than 6 months"))
 
+# # How to exclude oldest (first) order
+# more_than_1<-filter(ord_user, orders>1)
+# orders_2<-merge(orders, more_than_1)
+# gc()
+# fod<-ddply(orders_2,("user_id"), summarize, last_ord_date=min(as.Date(order_date)))
+# for (i in 1:nrow(more_than_1)){
+#         orders_2<- filter(orders_2,(user_id == more_than_1$user_id[i]), order_date == as.character(more_than_1$last_ord_date[i]) ))
+# }
+rm(group)
 # Save workspace environment
 save.image("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Orders_form_2014.RData")
 

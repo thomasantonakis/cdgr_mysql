@@ -6,7 +6,7 @@ library(dplyr)
 # Set timer
 ptm <- proc.time()
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                                   user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -47,7 +47,7 @@ proc.time() - ptm
 ########################
 # Mazemeno
 ########################
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"

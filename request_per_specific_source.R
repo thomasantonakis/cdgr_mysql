@@ -3,7 +3,7 @@ library(RMySQL)
 # Set timer
 ptm <- proc.time()
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -36,8 +36,7 @@ library(RGA)
 # Authenticate Google Analytics
 client.id = '543269518849-dcdk7eio32jm2i4hf241mpbdepmifj00.apps.googleusercontent.com'
 client.secret = '9wSw6gyDVXtcgqEe0XazoBWG'
-ga_token<-authorize(client.id, client.secret, cache = getOption("rga.cache"),
-                    verbose = getOption("rga.verbose"))
+ga_token<-authorize(client.id, client.secret, cache = getOption("rga.cache"))
 
 analytics<-get_ga(25764841, start.date = startdate, end.date = enddate,
             
@@ -56,8 +55,7 @@ analytics<-get_ga(25764841, start.date = startdate, end.date = enddate,
             sampling.level = NULL,
             start.index = NULL, 
             max.results = NULL, 
-            ga_token,
-            verbose = getOption("rga.verbose")
+            ga_token
 )
 
 ## cosmoradio einai to source tou campaign

@@ -10,7 +10,7 @@ ptm <- proc.time()
 
 ### COmpany report
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -57,7 +57,7 @@ proc.time() - ptm
 
 ### COmpany report February
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -105,7 +105,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report March
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -153,7 +153,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report April
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -200,7 +200,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report May
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -248,7 +248,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report June
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -296,7 +296,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report July
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -344,7 +344,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report August
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -392,7 +392,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report September
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -440,7 +440,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report October
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -488,7 +488,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report November
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -536,7 +536,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report December
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -584,7 +584,7 @@ company<-rbind(company, companytemp)
 
 ### COmpany report January
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -640,7 +640,7 @@ rest<-filter(company, CHAIN_ID == 0)
 
 ### Chain report January
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -681,7 +681,7 @@ proc.time() - ptm
 
 ### Chain report February
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -722,7 +722,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report March
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -763,7 +763,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report April
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -804,7 +804,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report May
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -846,7 +846,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report June
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -887,7 +887,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report July
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -929,7 +929,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report August
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -970,7 +970,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report September
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -1011,7 +1011,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report October
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -1053,7 +1053,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report November
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -1095,7 +1095,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report December
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
@@ -1136,7 +1136,7 @@ chain<-rbind(chain, chaintemp)
 
 ### Chain report January
 # Establish connection
-con <- dbConnect(RMySQL::MySQL(), host = 'db.clickdelivery.gr', port = 3307, dbname = "beta",
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
                  user = "tantonakis", password = "2secret4usAll!")
 # Send query
 rs <- dbSendQuery(con,"
