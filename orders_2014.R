@@ -38,7 +38,7 @@ rs <- dbSendQuery(con,"
                   ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = 1)
                   
                   
-                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-19')
+                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-25')
                   and ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
                   and  `restaurant_detail`.`language_id` = 1
                   
@@ -80,17 +80,38 @@ ord_user$grp_idle <- group
 barplot(table(ord_user$grp_idle), main="How long ago was your last order?", xlab="Days",
         names.arg=c("Less than 30 days", "1-2 months", "2-3 months", "3-4 months", "4-5 months", "5-6 months", "More than 6 months"))
 
-# # How to exclude oldest (first) order
-# more_than_1<-filter(ord_user, orders>1)
-# orders_2<-merge(orders, more_than_1)
-# gc()
-# fod<-ddply(orders_2,("user_id"), summarize, last_ord_date=min(as.Date(order_date)))
-# for (i in 1:nrow(more_than_1)){
-#         orders_2<- filter(orders_2,(user_id == more_than_1$user_id[i]), order_date == as.character(more_than_1$last_ord_date[i]) ))
-# }
+# How to exclude oldest (first) order
+wo_oldest<-arrange(orders, user_id, order_date)
+wo_oldest$index<- FALSE
+wo_oldest$index[2:nrow(wo_oldest)]<-wo_oldest$user_id[2:nrow(wo_oldest)] == wo_oldest$user_id[1:(nrow(wo_oldest)-1)]
+wo_oldest<-wo_oldest[wo_oldest$index,]
+
+# Recalculate ord_user, lod, ord_user
+ord_user_wo_oldest<-as.data.frame(table(wo_oldest$user_id))
+names(ord_user_wo_oldest)<-c("user_id", "orders")
+ord_user_wo_oldest$user_id<-as.numeric(as.character(ord_user_wo_oldest$user_id))
+ord_user_wo_oldest<-arrange(ord_user_wo_oldest, desc(orders))
+gc()
+lod_wo_oldest<-ddply(wo_oldest,("user_id"), summarize, last_ord_date=max(as.Date(order_date)))
+lod_wo_oldest$user_id<-as.numeric(lod_wo_oldest$user_id)
+
+ord_user_wo_oldest<-merge(ord_user_wo_oldest, lod_wo_oldest)
+rm(lod_wo_oldest)
+gc()
+
+# Segmentation for how long since last order
+ord_user_wo_oldest$days_idle<-as.Date(as.character(Sys.time(),format="%Y-%m-%d"))-as.Date(as.character(ord_user_wo_oldest$last_ord_date,format="%Y-%m-%d"))
+group <- cut(as.numeric(ord_user_wo_oldest$days_idle), c(0,30, 60, 90, 120, 150, 180, Inf), right=FALSE)
+names(group)<-c("Less than 30 days", "1-2 months", "2-3 months", "3-4 months", "4-5 months", "5-6 months", "More than 6 months")
+ord_user_wo_oldest$grp_idle <- group
+barplot(table(ord_user_wo_oldest$grp_idle), main="How long ago was your last order?", xlab="Days",
+        names.arg=c("Less than 30 days", "1-2 months", "2-3 months", "3-4 months", "4-5 months", "5-6 months", "More than 6 months"))
+
+
 rm(group)
 # Save workspace environment
 save.image("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Orders_form_2014.RData")
-
+# Print environment size
+print(paste('R is using', memory.size(), 'MB out of limit', memory.limit(), 'MB'))
 # Stop timer
 proc.time() - ptm
