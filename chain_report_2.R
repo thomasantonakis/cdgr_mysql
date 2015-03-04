@@ -627,6 +627,54 @@ companytemp <- dbFetch(rs, n=-1)
 dbDisconnect(con)
 # Stop timer
 proc.time() - ptm
+company<-rbind(company, companytemp)
+
+
+### COmpany report February
+# Establish connection
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
+                 user = "tantonakis", password = "2secret4usAll!")
+# Send query
+rs <- dbSendQuery(con,"
+                  
+                  SELECT `restaurant_shortname` AS `RESTAURANT_SHORTNAME`,
+                  `restaurant_name` AS `RESTAURANT_NAME`,
+                  `restaurantgroup_id` AS `CHAIN_ID`,
+                  `city_name` AS `CITY_NAME`,
+                  year(FROM_UNIXTIME(`order_master`.`i_date`)) as year,
+                  month(FROM_UNIXTIME(`order_master`.`i_date`)) as month,
+                  count(`order_master`.`order_id`) AS `ORDERS`,
+                  ROUND(SUM(`order_master`.`order_amt`),2) AS `ORDERSUM`,
+                  round(sum(`order_master`.`order_commission`), 2) AS `RESTAURANT_COMMISSION`,
+                  `prefecture_detail`.`prefecture_name` AS PREFECTURE
+                  
+                  
+                  FROM `order_master`
+                  JOIN `restaurant_master`
+                  USING (`restaurant_id`)
+                  JOIN `restaurant_detail`
+                  ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = 1)
+                  LEFT JOIN `city_detail`
+                  ON (`restaurant_master`.`restaurant_city_id` = `city_detail`.`city_id` AND `city_detail`.`language_id` =1)
+                  LEFT JOIN `city_master`
+                  ON (`city_master`.`city_id` = `city_detail`.`city_id`)
+                  LEFT JOIN `prefecture_detail`
+                  ON (`prefecture_detail`.`language_id` = 1 AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
+                  
+                  where ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
+                  AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-01')
+                  AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-03-01')
+                  GROUP BY `order_master`.`restaurant_id` 
+                  ORDER BY `restaurant_city_id` ASC, `restaurant_shortname` ASC
+                  
+                  ")
+
+# Fetch query results (n=-1) means all results
+companytemp <- dbFetch(rs, n=-1) 
+# close connection
+dbDisconnect(con)
+# Stop timer
+proc.time() - ptm
 
 company<-rbind(company, companytemp)
 rm(companytemp)
@@ -1161,6 +1209,46 @@ rs <- dbSendQuery(con,"
                   OR (`order_master`.`status` = 'REJECTED')))
                   AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-01-01')
                   AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-02-01')
+                  AND `restaurantgroup_id` > 0
+                  
+                  GROUP BY `restaurantgroup_id`
+                  
+                  ")
+
+# Fetch query results (n=-1) means all results
+chaintemp <- dbFetch(rs, n=-1) 
+# close connection
+dbDisconnect(con)
+chain<-rbind(chain, chaintemp)
+
+
+### Chain report February
+# Establish connection
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
+                 user = "tantonakis", password = "2secret4usAll!")
+# Send query
+rs <- dbSendQuery(con,"
+                  
+                  SELECT `restaurantgroup_template` AS RESTAURANT_SHORTNAME, 
+                  `restaurantgroup_shortname` as RESTAURANT_NAME,
+                  `restaurantgroup_id` AS `CHAIN_ID`, 
+                  year(FROM_UNIXTIME(`order_master`.`i_date`)) as year,
+                  month(FROM_UNIXTIME(`order_master`.`i_date`)) as month,
+                  count(`order_master`.`order_id`) AS `ORDERS`,
+                  round(sum(`order_master`.`order_amt`), 2) AS `ORDERSUM`, 
+                  round(sum(`order_master`.`order_commission`), 2) AS `RESTAURANT_COMMISSION`
+                  
+                  
+                  FROM `order_master`
+                  JOIN `restaurant_master`
+                  USING (`restaurant_id`)
+                  JOIN `restaurantgroup`
+                  USING (`restaurantgroup_id`)
+                  
+                  WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED')
+                  OR (`order_master`.`status` = 'REJECTED')))
+                  AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-01')
+                  AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-03-01')
                   AND `restaurantgroup_id` > 0
                   
                   GROUP BY `restaurantgroup_id`
