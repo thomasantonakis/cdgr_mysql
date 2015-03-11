@@ -38,7 +38,7 @@ rs <- dbSendQuery(con,"
                   ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = 1)
                   
                   
-                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-25')
+                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-26')
                   and ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
                   and  `restaurant_detail`.`language_id` = 1
                   
