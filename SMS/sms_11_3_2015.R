@@ -1,5 +1,6 @@
 # Load package
 library(RMySQL)
+library(dplyr)
 # Set timer
 ptm <- proc.time()
 # Establish connection
@@ -8,7 +9,7 @@ con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "be
 # Send query
 rs <- dbSendQuery(con,"
 
-SELECT `mobile`
+SELECT `user_id`,`mobile`
 FROM  `user_master` 
 WHERE `status` =  'NEW'
 AND  `usertype_id` =100
@@ -18,6 +19,7 @@ AND  `mobile` LIKE '69%'
 and  `status` !=  'INVALID'
 AND  `sms` = 1
 AND  `i_date` >= UNIX_TIMESTAMP(  '2015-02-9' ) 
+AND  `i_date` <= UNIX_TIMESTAMP(  '2015-03-11' )
 
                   ")
 # Fetch query results (n=-1) means all results
@@ -47,8 +49,10 @@ mobiles$user_id<-NULL
 d2<-rbind(d1,mobiles)
 d2<-unique(d2)
 d2$mobile<-as.numeric(d2$mobile)
-d2$mobile<-d2[d2$mobile>=69000000,]
-d2$mobile<-d2[d2$mobile<=69999999,]
+d2<-d2[!is.na(d2$mobile),]
+d2<-arrange(d2,mobile)
+d2<-d2[d2$mobile>=6900000000,]
+d2<-d2[d2$mobile<=6999999999,]
 
 library(xlsx)
 

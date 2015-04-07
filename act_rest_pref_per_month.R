@@ -14,8 +14,7 @@ rs <- dbSendQuery(con,"
 SELECT         			
                                 `prefecture_detail`.`prefecture_name` as PREF,
                                  COUNT(DISTINCT `restaurant_master`.`restaurant_id`) AS NUMBER_OF_RESTAURANTS,
-				count(`order_master`.`order_id`) AS `ORDERS`,
-				ROUND(SUM(`order_master`.`order_amt`),2) AS `ORDERSUM`,
+				
 				YEAR(FROM_UNIXTIME(`order_master`.`i_date`)) AS YEAR,
                                 MONTH(FROM_UNIXTIME(`order_master`.`i_date`)) AS MONTH
 				
@@ -35,12 +34,12 @@ SELECT
 
 				WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
 				AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2014-01-01')
-				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2014-02-01')
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-04-01')
 
 
-				GROUP BY  PREF, month, year
+				GROUP BY  year, month, pref
 
-				ORDER BY `restaurant_city_id` ASC, `restaurant_shortname` ASC
+				ORDER BY year ASC, month ASC, NUMBER_OF_RESTAURANTS DESC
                   
 
                   ")
