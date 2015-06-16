@@ -31,8 +31,8 @@ SELECT COUNT(*) AS VERIFIED_USERS,
                 LEFT JOIN `prefecture_detail`
                 ON (`prefecture_detail`.`language_id` = '2' AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
 
-                  WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2014-12-01')
-                  AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-01-01')
+                  WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-05-01')
+                  AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-05-15')
                   AND `user_master`.`status` = 'VERIFIED'
                   AND `user_master`.`is_deleted` = 'N'
                   GROUP BY `user_master`.`referal_source`, `city_master`.`city_id`
@@ -59,8 +59,8 @@ rs <- dbSendQuery(con,"
 
 SELECT COUNT(*) AS REGISTERED_USERS, `user_master`.`status`, `user_master`.`referal_source` AS SOURCE
         					FROM `user_master`
-						WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2014-12-01')
-						AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-01-01')
+						WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-01')
+						AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-05-15')
 						AND `user_master`.`is_deleted` = 'N'
 						GROUP BY `user_master`.`status`, `user_master`.`referal_source`
 
@@ -99,8 +99,8 @@ SUM(`order_master`.`order_commission`) AS COMMISSION
 						ON (`city_detail`.`language_id` = '2' AND `user_address`.`city_id` = `city_detail`.`city_id`)
 						JOIN `prefecture_detail`
 						ON (`prefecture_detail`.`language_id` = '2' AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
-						WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP('2014-12-01')
-						AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-01-01')
+						WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-01')
+						AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-05-15')
 						AND `order_master`.`status` IN ('VERIFIED', 'REJECTED')
 						AND `order_master`.`is_deleted` = 'N'
 						GROUP BY `order_master`.`status`, `order_master`.`order_referal`, `city_detail`.`city_id`
@@ -130,6 +130,8 @@ orders_src$cat<-""
 registered_src$cat[registered_src$SOURCE == "Android"]<-"android"
 verified_src$cat[verified_src$SOURCE == "Android"]<-"android"
 orders_src$cat[orders_src$SOURCE == "Android"]<-"android"
+
+
 # iOS
 registered_src$cat[registered_src$SOURCE == "IOS"]<-"ios"
 verified_src$cat[verified_src$SOURCE == "IOS"]<-"ios"
@@ -173,9 +175,9 @@ verified_src$cat[verified_src$cat == ""]<-"direct"
 orders_src$cat[orders_src$cat == ""]<-"direct"
 
 # Adwords
-registered_src$cat[grep("google|cpc", registered_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
-verified_src$cat[grep("google|cpc", verified_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
-orders_src$cat[grep("google|cpc", orders_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
+registered_src$cat[grep("google\\|cpc", registered_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
+verified_src$cat[grep("google\\|cpc", verified_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
+orders_src$cat[grep("google\\|cpc", orders_src$SOURCE , ignore.case=FALSE, fixed=TRUE)]<-"adwords"
 
 
 library(plyr)

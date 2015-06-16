@@ -49,14 +49,14 @@ class ReportsController extends AppController {
  
 	var $helpers = array('Html', 'Form', 'Javascript', 'Ajax');
 	
-	var $components = array('RequestHandler', 'Filter',"Captcha",'Email');
+	var $components = array('RequestHandler', 'Filter', 'Email');
 	/**
 	 * This controller does not use a model
 	 *
 	 * @var array
 	 * @access public
 	 */
-	var $uses = array('prefecturedetail', 'clientappdump');
+	var $uses = array('prefecturedetail', 'clientappdump', 'competitorcity', 'restaurant', 'competitorrestaurant');
 	#var $uses = array('page', 'order', 'orderdetail', 'customer', 'restaurant', 'restaurantcuisine', 'cuisinedetail', 'item','review');
 	/**
 	 * Displays a view
@@ -595,6 +595,45 @@ class ReportsController extends AppController {
 				":lang" => array('id' => "lang")
 			)
 		),
+		"unused_restaurants" => array(
+			"query" => "SELECT `restaurant_master`.`restaurant_id` AS restaurant_id, `invoices`.`total_amount` AS last_invoice_amount, `restaurant_detail`.`restaurant_name` AS restaurant_name, CONCAT('<a href=\"http://admin.clickdelivery.gr/admin/restaurants/edit/',`restaurant_master`.`restaurant_id`,'\">link</a>') as link, IF(`restaurant_master`.`polling` = 1, 'ClientApp', 'Terminal') AS ClientApp_Terminal, `restaurant_master`.`start_date`, `prefecture_detail`.`prefecture_name`, `city_detail`.`city_name`, `user_master`.`last_name`
+						FROM `restaurant_master`
+						INNER JOIN `restaurant_detail`
+						ON (`restaurant_master`.`restaurant_id` = `restaurant_detail`.`restaurant_id`)
+						INNER JOIN `invoices`
+						ON (`restaurant_master`.`restaurant_id` = `invoices`.`restaurant_id`)
+						INNER JOIN `city_master`
+						ON (`restaurant_master`.`restaurant_city_id` = `city_master`.`city_id`)
+						INNER JOIN `city_detail`
+						ON (`city_master`.`city_id` = `city_detail`.`city_id` AND `city_detail`.`language_id` = `restaurant_detail`.`language_id`)
+						INNER JOIN `prefecture_detail`
+						ON (`city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id` AND `city_detail`.`language_id` = `prefecture_detail`.`language_id`)
+						INNER JOIN `user_master`
+						ON (`user_master`.`user_id` = `restaurant_master`.`account_manager_id`)
+						WHERE `restaurant_master`.`is_active` = 'Y'
+						AND `restaurant_master`.`is_deleted` = 'N' 
+						AND `restaurant_detail`.`language_id` = :lang
+						AND `invoices`.`total_amount` <= 5
+						AND `invoices`.`invoice_date` IN (
+							SELECT MAX(`invoices`.`invoice_date`)
+							FROM `invoices`
+							WHERE `invoices`.`restaurant_id` = `restaurant_master`.`restaurant_id`
+						)
+						AND (
+							`restaurant_master`.`start_date` <= DATE_SUB(CURDATE(), INTERVAL 2 MONTH)
+							OR
+							(
+								SELECT COUNT(*)
+								FROM `invoices`
+								WHERE `invoices`.`restaurant_id` = `restaurant_master`.`restaurant_id`
+							) >= 2
+						)
+						GROUP BY `restaurant_master`.`restaurant_id`",
+			"group" => "restaurant_statistics",
+			"placeholders" => array(
+				":lang" => array('id' => "lang")
+			)
+		),
 		"chain_item_sales" => array(
 			"query" => "SELECT `item_detail`.`item_name` AS ITEM, SUM(`item_qty`) AS QUANTITY FROM `order_detail`
 						JOIN `order_master`
@@ -1049,6 +1088,25 @@ class ReportsController extends AppController {
 				)
 			)
 		),
+		"coupon_stats_per_series" => array(
+			"query" => "SELECT
+					LEFT(promo_id , 3) AS COUPON_SERIES,
+					COUNT(*) AS ISSUED_COUPONS,
+					description AS DESCRIPTION,
+					SUM(IF((userpromo.promo_id RLIKE CONCAT('^', LEFT(userpromo.promo_id, 3)) AND user.verification_date < userpromo.valid_after AND user.status = 'VERIFIED'), 1, 0)) AS OLD,
+					SUM(IF((userpromo.promo_id RLIKE CONCAT('^', LEFT(userpromo.promo_id, 3)) AND user.verification_date >= userpromo.valid_after AND user.status = 'VERIFIED'), 1, 0)) AS NEW,
+					SUM(IF((userpromo.promo_id RLIKE CONCAT('^', LEFT(userpromo.promo_id, 3)) AND user.status IN ('NEW','MANUAL')), 1, 0)) AS UNVERIFIED,
+					SUM(IF((userpromo.promo_id RLIKE CONCAT('^', LEFT(userpromo.promo_id, 3)) AND user.status IN ('VERIFIED','NEW','MANUAL')), 1, 0)) AS VERIFIED,
+					DATE(FROM_UNIXTIME(userpromo.valid_after)) AS DATE_OPEN,
+					userpromo.valid_until AS DATE_CLOSED
+				FROM user_promos AS userpromo
+				LEFT JOIN user_master AS `user`
+					ON (`userpromo`.`user_id` != 0 AND `user`.`user_id` = `userpromo`.`user_id`)
+				GROUP BY COUPON_SERIES
+				ORDER BY DATE_OPEN DESC",
+			"group" => "marketing_statistics",
+			"placeholders" => array()
+		),
 		"secret_promo_stats" => array(
 			"query" => "SELECT promouser.secret_promo_id AS PROMO,
 					SUM(IF(user.status='VERIFIED', 1, 0)) AS TOTAL_VERIFIED,
@@ -1062,7 +1120,6 @@ class ReportsController extends AppController {
 					USING(secret_promo_id)
 					INNER JOIN user_master AS user
 					USING(user_id)
-					WHERE promo.is_deleted = 'N'
 					GROUP BY secret_promo_id
 					UNION
 					SELECT 'TOTAL',
@@ -1076,7 +1133,6 @@ class ReportsController extends AppController {
 						SELECT user.status, user.i_date, promo.secret_promo_id FROM secret_promo_user AS promouser
 						INNER JOIN secret_promo_master AS promo USING(secret_promo_id)
 						INNER JOIN user_master AS user ON (user.user_id = promouser.user_id)
-						WHERE promo.is_deleted = 'N'
 						GROUP BY user.user_id
 					) AS t",
 			"group" => "marketing_statistics",
@@ -1101,13 +1157,35 @@ class ReportsController extends AppController {
 				)
 			)
 		),
+		"restaurant_coupon_balances" => array(
+			"query" => "SELECT `restaurantbalance_id`, DATE_FORMAT(`transaction_date`,'%d-%m-%Y') AS transaction_date, `balance_type`, `transaction_number`, ROUND(`balance_amount`, 2) AS balance_amount, `restaurant_shortname`, `name`, `vat_id`, CONCAT('Κουπόνια ', `name`) AS balance_name
+						FROM `restaurant_balance`
+						JOIN `restaurant_master`
+						USING (`restaurant_id`)
+						JOIN `company_master`
+						USING (`company_id`)
+						WHERE `balance_amount` <= 0
+						AND `transaction_date` >= :transaction_date
+						AND `transaction_date` < DATE_ADD(:transaction_date, INTERVAL 1 MONTH)
+						AND `transaction_number` = 'Συμψηφισμός από κουπόνια'
+						ORDER BY `transaction_date`",			
+			"group" => "accounting_statistics",
+			"placeholders" => array(
+				":transaction_date" => array(
+					"id" => "transaction_date",
+					"type" => Placeholders::Year_Month
+				)
+			)
+		),
 		"restaurant_payments" => array(
 			"query" => "SELECT `restaurantbalance_id`, `transaction_date`, `balance_type`, `transaction_number`, (-1 * ROUND(`balance_amount`, 2)) AS balance_amount, `restaurant_shortname`, `name`, `vat_id`,
 						CASE
 							WHEN `balance_type` = 'CASH PAYMENT' THEN '38.01.00.0000'
 							WHEN `balance_type` = 'PIRAEUS PAYMENT' THEN '38.02.00.0000'
 							WHEN `balance_type` = 'EUROBANK PAYMENT' THEN '38.02.00.0001'
-						END AS accounting_account
+						END AS accounting_account,
+						IF(`balance_type` = 'CASH PAYMENT', 3900, 3901) AS accounting_code,
+						IF(`balance_type` = 'CASH PAYMENT', CONCAT('Είσπραξη Μετρητών από ', `name`), CONCAT('Κατάθεση από ', `name`)) AS accounting_description
 						FROM `restaurant_balance`
 						JOIN `restaurant_master`
 						USING (`restaurant_id`)
@@ -1186,7 +1264,8 @@ class ReportsController extends AppController {
 						ROUND(SUM(IF(total_rest_balances.rest_balance >= 20, total_rest_balances.rest_balance, 0)), 2) AS TOTAL_RECEIVABLES_OVER_THRESHOLD,
 						ROUND(SUM(IF(total_rest_balances.rest_balance < 0, total_rest_balances.rest_balance, 0)), 2) AS TOTAL_PAYABLES,
 						ROUND(SUM(total_rest_balances.rest_balance), 2) AS TOTAL_BALANCE,
-						ROUND(SUM(IF(((restaurant.is_active = 'N' OR restaurantschedule.is_active = 'N') AND restaurant.is_deleted='N'),total_rest_balances.rest_balance, 0)), 2) AS TOTAL_LOCKED,
+						ROUND(SUM(IF((restaurant.is_active = 'Y' AND restaurantschedule.is_active = 'N' AND restaurant.is_deleted='N'),total_rest_balances.rest_balance, 0)), 2) AS TOTAL_LOCKED,
+						ROUND(SUM(IF((restaurant.is_active = 'N' AND restaurant.is_deleted='N'),total_rest_balances.rest_balance, 0)), 2) AS TOTAL_DISABLED,
 						ROUND(SUM(IF(restaurant.is_deleted = 'Y', total_rest_balances.rest_balance, 0)), 2) AS TOTAL_DELETED
 						FROM (
 						SELECT restaurant_id, SUM(restaurantbalance.balance_amount) as rest_balance
@@ -1265,39 +1344,429 @@ class ReportsController extends AppController {
 				)
 			)
 		),
+		"competitor_restaurant_stats_report_per_region" => array(
+			"query" => "SELECT DISTINCT CityName AS Prefecture, 
+							SUM(CASE WHEN CDRestaurantName IS NOT NULL AND CDRestaurantIsActive = 'Y' AND CDRestaurantIsDeleted = 'N' THEN 1 ELSE 0 END) AS TotalActiveCDRestaurants,
+							SUM(CASE WHEN CompetitorRestaurantName IS NOT NULL AND CompetitorRestaurantIsDeleted = 'N' THEN 1 ELSE 0 END) AS TotalActiveCompetitorRestaurants,
+							SUM(CASE WHEN CompetitorRestaurantName IS NOT NULL AND CDRestaurantName IS NOT NULL AND CDRestaurantIsActive = 'Y' AND CDRestaurantIsDeleted = 'N' AND CompetitorRestaurantIsDeleted = 'N' THEN 1 ELSE 0 END) AS CommonActiveRestaurants,
+							SUM(CASE WHEN CompetitorRestaurantName IS NOT NULL AND CDRestaurantName IS NOT NULL AND (CDRestaurantIsActive = 'N ' OR CDRestaurantIsDeleted = 'Y') AND CompetitorRestaurantIsDeleted = 'Y' THEN 1 ELSE 0 END) AS CommonInactiveRestaurants,
+							SUM(CASE WHEN CompetitorRestaurantName IS NULL AND CDRestaurantName IS NOT NULL AND CDRestaurantIsActive = 'Y' AND CDRestaurantIsDeleted = 'N' THEN 1 ELSE 0 END) AS OnlyActiveCDRestaurants,
+							SUM(CASE WHEN CompetitorRestaurantName IS NOT NULL AND CDRestaurantName IS NULL AND CompetitorRestaurantIsDeleted = 'N' THEN 1 ELSE 0 END) AS OnlyActiveCompetitorRestaurants
+						FROM (
+						(SELECT citydetail.city_name AS CityName,  
+							restaurantdetail.restaurant_name AS CDRestaurantName, 
+							competitorrestaurant.restaurant_name AS CompetitorRestaurantName,
+							competitorrestaurant.is_deleted AS CompetitorRestaurantIsDeleted,
+							competitorrestaurant.address_locality AS CompetitorRestaurantLocality,
+							restaurant.is_active AS CDRestaurantIsActive,
+							restaurant.is_deleted AS CDRestaurantIsDeleted
+						FROM `competitor_restaurant_master` AS competitorrestaurant
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorrestaurant.competitor_city_id = competitorcity.city_id)
+						LEFT JOIN city_master AS city
+							USING(prefecture_id)
+						LEFT JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.city_id
+						LEFT JOIN restaurant_master AS restaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							ON (restaurantdetail.restaurant_id = restaurant.restaurant_id AND restaurantdetail.language_id = citydetail.language_id)
+						WHERE city.prefecture_id = city.city_id
+							AND citydetail.language_id = 2)
+						UNION
+						(SELECT citydetail.city_name AS CityName,  
+							restaurantdetail.restaurant_name AS CDRestaurantName, 
+							competitorrestaurant.restaurant_name AS CompetitorRestaurantName,
+							competitorrestaurant.is_deleted AS CompetitorRestaurantIsDeleted,
+							competitorrestaurant.address_locality AS CompetitorRestaurantLocality,
+							restaurant.is_active AS CDRestaurantIsActive,
+							restaurant.is_deleted AS CDRestaurantIsDeleted
+						FROM `restaurant_master` AS restaurant
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							USING(restaurant_id)
+						INNER JOIN city_master AS city
+							ON city.city_id = restaurant.restaurant_city_id
+						INNER JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.prefecture_id and citydetail.language_id = restaurantdetail.language_id
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorcity.prefecture_id = city.prefecture_id)
+						LEFT JOIN competitor_restaurant_master AS competitorrestaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						WHERE restaurantdetail.language_id = 2
+							AND restaurant_city_id > 0)
+						) t
+						GROUP BY Prefecture",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"total_active_CD_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `restaurantdetail`.`restaurant_name`, `restaurantdetail`.`address` AS address, `user`.`last_name` AS account_manager, `competitorrestaurant`.`address_locality` AS competitor_address_locality
+						FROM `restaurant_master` AS restaurant
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							USING(restaurant_id)
+						INNER JOIN city_master AS city
+							ON city.city_id = restaurant.restaurant_city_id
+						INNER JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.prefecture_id and citydetail.language_id = restaurantdetail.language_id
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorcity.prefecture_id = city.prefecture_id)
+						LEFT JOIN competitor_restaurant_master AS competitorrestaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE restaurantdetail.language_id = 2
+							AND restaurant_city_id > 0
+							AND restaurant.is_active = 'Y'
+							AND restaurant.is_deleted = 'N'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"total_active_competitor_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `competitorrestaurant`.`restaurant_name`, `competitorcity`.`city_name` AS competitor_city, `user`.`last_name` AS account_manager, `competitorrestaurant`.`address_locality` AS competitor_address_locality 
+						FROM `competitor_restaurant_master` AS competitorrestaurant
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorrestaurant.competitor_city_id = competitorcity.city_id)
+						LEFT JOIN city_master AS city
+							USING(prefecture_id)
+						LEFT JOIN city_detail AS citydetail
+							ON (citydetail.city_id = city.city_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE city.prefecture_id = city.city_id
+						AND citydetail.language_id = 2
+						AND user.language = 2
+						AND competitorrestaurant.is_deleted = 'N'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"only_active_competitor_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `competitorrestaurant`.`restaurant_name`, `competitorcity`.`city_name` AS competitor_city, `user`.`last_name` AS account_manager , `competitorrestaurant`.`address_locality` AS competitor_address_locality
+						FROM `competitor_restaurant_master` AS competitorrestaurant
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorrestaurant.competitor_city_id = competitorcity.city_id)
+						LEFT JOIN city_master AS city
+							USING(prefecture_id)
+						LEFT JOIN city_detail AS citydetail
+							ON (citydetail.city_id = city.city_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE city.prefecture_id = city.city_id
+						AND citydetail.language_id = 2
+						AND user.language = 2
+						AND competitorrestaurant.restaurant_id = 0
+						AND competitorrestaurant.is_deleted = 'N'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"only_active_CD_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `restaurantdetail`.`restaurant_name`, `restaurantdetail`.`address` AS address, `user`.`last_name` AS account_manager
+						FROM `restaurant_master` AS restaurant
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							USING(restaurant_id)
+						INNER JOIN city_master AS city
+							ON city.city_id = restaurant.restaurant_city_id
+						INNER JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.prefecture_id and citydetail.language_id = restaurantdetail.language_id
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorcity.prefecture_id = city.prefecture_id)
+						LEFT JOIN competitor_restaurant_master AS competitorrestaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE restaurantdetail.language_id = 2
+							AND restaurant_city_id > 0
+							AND competitorrestaurant.competitor_restaurant_line_id IS NULL
+							AND restaurant.is_active = 'Y'
+							AND restaurant.is_deleted = 'N'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"common_active_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `restaurantdetail`.`restaurant_name`, `restaurantdetail`.`address` AS address, `user`.`last_name` AS account_manager, `competitorrestaurant`.`address_locality` AS competitor_address_locality
+						FROM `restaurant_master` AS restaurant
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							USING(restaurant_id)
+						INNER JOIN city_master AS city
+							ON city.city_id = restaurant.restaurant_city_id
+						INNER JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.prefecture_id and citydetail.language_id = restaurantdetail.language_id
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorcity.prefecture_id = city.prefecture_id)
+						LEFT JOIN competitor_restaurant_master AS competitorrestaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE restaurantdetail.language_id = 2
+							AND restaurant_city_id > 0
+							AND restaurant.restaurant_id = competitorrestaurant.restaurant_id
+							AND restaurant.is_active = 'Y'
+							AND restaurant.is_deleted = 'N'
+							AND competitorrestaurant.is_deleted = 'N'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"common_inactive_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `restaurantdetail`.`restaurant_name`, `restaurantdetail`.`address` AS address, `user`.`last_name` AS account_manager , `competitorrestaurant`.`address_locality` AS competitor_address_locality
+						FROM `restaurant_master` AS restaurant
+						LEFT JOIN restaurant_detail AS restaurantdetail
+							USING(restaurant_id)
+						INNER JOIN city_master AS city
+							ON city.city_id = restaurant.restaurant_city_id
+						INNER JOIN city_detail AS citydetail
+							ON citydetail.city_id = city.prefecture_id and citydetail.language_id = restaurantdetail.language_id
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorcity.prefecture_id = city.prefecture_id)
+						LEFT JOIN competitor_restaurant_master AS competitorrestaurant
+							ON (restaurant.restaurant_id = competitorrestaurant.restaurant_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE restaurantdetail.language_id = 2
+							AND restaurant_city_id > 0
+							AND restaurant.restaurant_id = competitorrestaurant.restaurant_id
+							AND (restaurant.is_active = 'N' OR restaurant.is_deleted = 'Y')
+							AND competitorrestaurant.is_deleted = 'Y'",
+			"group" => "competitor_statistics",
+			"placeholders" => array()
+		),
+		"deleted_competitor_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `competitorrestaurant`.`restaurant_name`, `competitorcity`.`city_name` AS competitor_city, `user`.`last_name` AS account_manager , `competitorrestaurant`.`address_locality` AS competitor_address_locality
+						FROM `competitor_restaurant_master` AS competitorrestaurant
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorrestaurant.competitor_city_id = competitorcity.city_id)
+						LEFT JOIN city_master AS city
+							USING(prefecture_id)
+						LEFT JOIN city_detail AS citydetail
+							ON (citydetail.city_id = city.city_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE city.prefecture_id = city.city_id
+						AND citydetail.language_id = 2
+						AND user.language = 2
+						AND competitorrestaurant.is_deleted = 'Y'
+						AND competitorrestaurant.d_date >= UNIX_TIMESTAMP(:from_date)
+						AND competitorrestaurant.d_date < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))",
+			"group" => "competitor_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"new_competitor_restaurants_per_city" => array(
+			"query" => "SELECT `citydetail`.`city_name` AS cd_city, `competitorrestaurant`.`restaurant_name`, `competitorcity`.`city_name` AS competitor_city, `user`.`last_name` AS account_manager , `competitorrestaurant`.`address_locality` AS competitor_address_locality, IF(`competitorrestaurant`.`restaurant_id` = 0, 
+'unmatched', 'matched') AS matched
+						FROM `competitor_restaurant_master` AS competitorrestaurant
+						LEFT JOIN competitor_city_master AS competitorcity
+							ON (competitorrestaurant.competitor_city_id = competitorcity.city_id)
+						LEFT JOIN city_master AS city
+							USING(prefecture_id)
+						LEFT JOIN city_detail AS citydetail
+							ON (citydetail.city_id = city.city_id)
+						INNER JOIN `user_master` AS user
+							ON (user.user_id = city.city_account_manager_id)
+						WHERE city.prefecture_id = city.city_id
+						AND citydetail.language_id = 2
+						AND user.language = 2
+						AND competitorrestaurant.is_deleted = 'N'
+						AND competitorrestaurant.i_date >= UNIX_TIMESTAMP(:from_date)
+						AND competitorrestaurant.i_date < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))",
+			"group" => "competitor_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
 		"catalog_report" => array(
 			"query" => "SELECT user.last_name AS Agent, catalog.name AS Catalog
 						FROM  `catalog_master` AS catalog
 						JOIN `user_master` AS user
 						ON catalog.u_by = user.user_id
 						WHERE  catalog.`is_deleted` LIKE 'N'
-                                                AND catalog.`i_date` >= UNIX_TIMESTAMP(:from_date)
-                                                AND catalog.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
+						AND catalog.`i_date` >= UNIX_TIMESTAMP(:from_date)
+						AND catalog.`i_date` < UNIX_TIMESTAMP(DATE_ADD(:to_date, INTERVAL 1 DAY))
 						ORDER BY  user.last_name ASC, catalog.`i_date` ASC",
 			"group" => "backoffice_statistics",
-                        "placeholders" => array(
-                                ":from_date" => array(
-                                        "id" => "from_date",
-                                        "type" => Placeholders::Date,
-                                        "relations" => array(
-                                                array(
-                                                        "with" => "to_date",
-                                                        "type" => "<="
-                                                )
-                                        )
-                                ),
-                                ":to_date" => array(
-                                        "id" => "to_date",
-                                        "type" => Placeholders::Date,
-                                        "relations" => array(
-                                                array(
-                                                        "with" => "from_date",
-                                                        "type" => ">="
-                                                )
-                                        )
-                                )
-                        )
+						"placeholders" => array(
+								":from_date" => array(
+										"id" => "from_date",
+										"type" => Placeholders::Date,
+										"relations" => array(
+												array(
+														"with" => "to_date",
+														"type" => "<="
+												)
+										)
+								),
+								":to_date" => array(
+										"id" => "to_date",
+										"type" => Placeholders::Date,
+										"relations" => array(
+												array(
+														"with" => "from_date",
+														"type" => ">="
+												)
+										)
+								)
+						)
 		),
+		"late_calls_per_agent" => array(
+			"query" => "SELECT '>' AS Type, `dst` AS receiver, TIME_FORMAT(SEC_TO_TIME(SUM(`billsec`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE `disposition` = 'ANSWERED'
+						AND `src` LIKE '000%'
+						AND `dst` LIKE '4%'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date
+						GROUP BY `dst`
+						UNION
+						SELECT 'TOTAL' AS Type, '' AS receiver, TIME_FORMAT(SEC_TO_TIME(SUM(`billsec`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE `disposition` = 'ANSWERED'
+						AND `src` LIKE '000%'
+						AND `dst` LIKE '4%'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date",
+			"group" => "backoffice_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"outgoing_calls_per_agent" => array(
+			"query" => "SELECT '' AS Type, SUBSTR(`channel`,5,3) AS agent, TIME_FORMAT(SEC_TO_TIME(SUM(`duration`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE `src` = '2122133098'
+						AND ((`dst` LIKE '1%') OR (`dst`LIKE '2%') OR (`dst` LIKE '6%') OR (`dst` LIKE '8%'))
+						AND `channel` LIKE 'SIP/4%'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date
+						GROUP BY SUBSTR(`channel`,5,3)
+						UNION
+						SELECT 'TOTAL' AS Type, '' AS agent, TIME_FORMAT(SEC_TO_TIME(SUM(`duration`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE `src` = '2122133098'
+						AND ((`dst` LIKE '1%') OR (`dst`LIKE '2%') OR (`dst` LIKE '6%') OR (`dst` LIKE '8%'))
+						AND `channel` LIKE 'SIP/4%'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date",
+			"group" => "backoffice_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		),
+		"external_incoming_calls_per_agent" => array(
+			"query" => "SELECT '>' AS Type, `dst` AS receiver, TIME_FORMAT(SEC_TO_TIME(SUM(`billsec`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE ((`src` LIKE '1%') OR (`src`LIKE '2%') OR (`src` LIKE '6%') OR (`src` LIKE '8%'))  
+						AND `dst`  LIKE '4%'
+						AND `disposition` = 'ANSWERED'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date
+						GROUP BY `dst`
+						UNION
+						SELECT 'TOTAL' AS Type, '' AS receiver, TIME_FORMAT(SEC_TO_TIME(SUM(`billsec`)), '%H:%i:%s') AS duration, COUNT(*) AS calls
+						FROM `asteriskcdrdb`.`cdr`
+						WHERE ((`src` LIKE '1%') OR (`src`LIKE '2%') OR (`src` LIKE '6%') OR (`src` LIKE '8%'))  
+						AND `dst`  LIKE '4%'
+						AND `disposition` = 'ANSWERED'
+						AND `calldate` >= :from_date
+						AND `calldate` < :to_date",
+			"group" => "backoffice_statistics",
+			"placeholders" => array(
+				":from_date" => array(
+					"id" => "from_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "to_date",
+							"type" => "<="
+						)
+					)
+				),
+				":to_date" => array(
+					"id" => "to_date",
+					"type" => Placeholders::Date,
+					"relations" => array(
+						array(
+							"with" => "from_date",
+							"type" => ">="
+						)
+					)
+				)
+			)
+		)
 	);
 
 	function createDateRangeArray($strDateFrom,$strDateTo) {
@@ -1873,7 +2342,7 @@ class ReportsController extends AppController {
 		$prefecturetotalstats['Total'] = $result[0][0];
 
 		//debug ($orderstats);
-		//debug ($prefecturetotalstats);
+		// debug ($prefecturetotalstats);
 		$this->set("orderstats", $orderstats);
 		$this->set("prefecturetotalstats", $prefecturetotalstats);
 	}
@@ -2020,6 +2489,89 @@ class ReportsController extends AppController {
 			'orderstats' => $orderstats,
 			'citytotalstats' => $citytotalstats
 		));
+
+		$orderstats_total = $conn->fetchall("
+		SELECT `date`,`city_name`, `city_stats`.`prefecture_id`, `verified_orders`, `android_orders`, `ios_orders`, `canceled_orders`, `registrations`, `verifications`, `total_sales`, `total_commissions`,
+		`0_3`, `3_6`, `6_9`, `9_12`, `12_15`, `15_18`, `18_21`, `21_24`, `thisyear_orders`, `lastyear_orders`
+		FROM `city_stats`
+		JOIN `prefecture_detail`
+		ON (`prefecture_detail`.`prefecture_id`=`city_stats`.`prefecture_id`)
+		JOIN `city_master`
+		USING (`city_id`)
+		JOIN `city_detail`
+		USING (`city_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		AND `city_id` != 0
+		AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		AND (`city_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")".implode(" ", $extra_conditions)
+			." ORDER BY `city_id` ASC, `date` DESC 
+		");
+
+		$city_totalstats = array();
+
+		$result = $conn->fetchall("
+		SELECT `city_name`, SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `city_stats`
+		JOIN `prefecture_detail`
+		USING (`prefecture_id`)
+		JOIN `city_master`
+		USING (`city_id`)
+		JOIN `city_detail`
+		USING (`city_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."'
+		AND `city_id` != 0
+		AND (`prefecture_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")
+		AND (`city_detail`.`language_id` = ".$this->Session->read('SS_LANGUAGEID').")".implode(" ", $extra_conditions)." 
+		GROUP BY `city_id`
+		ORDER BY `city_id` ASC, `date` DESC 
+		");
+
+		foreach ($result as $row) {
+			$city_totalstats[$row['city_detail']['city_name']] = $row[0];
+		}
+
+		$result = $conn->fetchall("
+		SELECT `date`, SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `city_stats`
+		LEFT JOIN `city_master`
+		USING (`city_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."' ".implode(" ", $extra_conditions)." 
+		GROUP BY `date`
+		ORDER BY `date` DESC 
+		");
+
+		$totalstats_by_day = array();
+		foreach ($result as $row) {
+			$totalstats_by_day[] = array(
+						'city_stats' => array_merge($row['city_stats'], $row[0]),
+						'city_detail' => array('city_name' => 'Total')
+			);
+		}
+		$this->set("totalstats_by_day", $totalstats_by_day);
+
+		$orderstats_total = array_merge ($totalstats_by_day, $orderstats_total);
+
+		$result = $conn->fetchall("
+		SELECT SUM(`verified_orders`) AS verified_orders, SUM(`android_orders`) AS android_orders, SUM(`ios_orders`) AS ios_orders, SUM(`canceled_orders`) AS canceled_orders, SUM(`registrations`) AS registrations, SUM(`verifications`) AS verifications, SUM(`total_sales`) AS total_sales, SUM(`total_commissions`) AS total_commissions,
+		SUM(`0_3`) AS 0_3, SUM(`3_6`) AS 3_6, SUM(`6_9`) AS 6_9, SUM(`9_12`) AS 9_12, SUM(`12_15`) AS 12_15, SUM(`15_18`) AS 15_18, SUM(`18_21`) AS 18_21, SUM(`21_24`) AS 21_24, SUM(`thisyear_orders`) AS thisyear_orders, SUM(`lastyear_orders`) AS lastyear_orders
+		FROM `city_stats`
+		LEFT JOIN `city_master`
+		USING (`city_id`)
+		WHERE `date` >= '".$startdate."'
+		AND `date` <= '".$enddate."' ".implode(" ", $extra_conditions)." 
+		");
+
+		$city_totalstats['Total'] = $result[0][0];
+
+		//debug ($orderstats);
+		// debug ($prefecturetotalstats);
+		$this->set("orderstats_total", $orderstats_total);
+		$this->set("city_totalstats", $city_totalstats);		
 	}
 
 	function admin_custom_stats () {
@@ -2041,19 +2593,17 @@ class ReportsController extends AppController {
 			// $query_labels[$query_key] = $queries[$query_key]['label'];
 		}
 		#Humanize group names
-	    $human_labels = array();
-	    foreach ($query_labels as $key => $value) {
-	    	$human_labels[Inflector::humanize($key)] = $value;
-	    }
+		$human_labels = array();
+		foreach ($query_labels as $key => $value) {
+			$human_labels[Inflector::humanize($key)] = $value;
+		}
 		$this->set("queries", $queries);
 		$this->set("query_labels", $human_labels);
 	}
 
 	function admin_generate_excel() {
-		// debug( $this->data );
 		$this->autoRender = false;
 		$this->admin_checkSession();
-
 		$temp_results = $this->execute_query();
 
 		$arrayForExcel = $this->generateExcelArray($temp_results);
@@ -2254,7 +2804,7 @@ class ReportsController extends AppController {
 		$user_data = $this->user->find("list", array(
 			"fields" => array("user.user_id", "user.email_id"),
 			"conditions" => array(
-				"user.usertype_id = 2",
+				"user.usertype_id" => 2,
 				"user.is_active" => "Y",
 				"user.is_deleted" => "N"
 			),
@@ -2288,10 +2838,487 @@ class ReportsController extends AppController {
 		$this->set('url', $this->Filter->url);
 	}
 
+	function admin_competitor() {
+		$this->admin_checkSession();
+
+		// Check if there are any post data
+		if(isset($this->data)) {
+			Configure::write("debug", 0);
+			$this->autoRender = false;
+			if(isset($this->data['isCompetitor']) && $this->data['isCompetitor']) {
+				$conditions = array(
+					"competitorcity.referral" => "efood",
+					"competitorcity.prefecture_id" => $this->data['prefectureId'],
+					"competitorrestaurantmaster.competitor_restaurant_id" => $this->data['competitorRestaurantId']
+				);
+			}
+			else {
+				$conditions = array(
+					"competitorcity.referral" => "efood",
+					"competitorcity.prefecture_id" => $this->data['prefectureId'],
+					"competitorrestaurantmaster.restaurant_id" => $this->data['competitorRestaurantId']
+				);
+			}
+			if($competitorRestaurantData = $this->competitorcity->find("first",array(
+				"recursive" => -1,
+				"fields" => array("competitorrestaurantmaster.*"),
+				"joins" => array(
+					array(
+						"table" => "competitor_restaurant_master",
+						"alias" => "competitorrestaurantmaster",
+						"type" => "LEFT",
+						"conditions" => array(
+							"competitorrestaurantmaster.competitor_city_id = competitorcity.city_id"
+						)
+					)
+				),
+				"conditions" => $conditions
+			)));
+
+			$competitorRestaurantData['competitorrestaurantmaster']['prefectureId'] = $this->data['prefectureId'];
+
+			if($competitorRestaurantData["competitorrestaurantmaster"]['not_in_cd'] == 'Y')
+				return 0;
+			else if ($competitorRestaurantData["competitorrestaurantmaster"]['restaurant_id'] > 0) {
+				return (isset($this->data['isCompetitor']) && $this->data['isCompetitor'])? $competitorRestaurantData["competitorrestaurantmaster"]['restaurant_id'] : $competitorRestaurantData["competitorrestaurantmaster"]["competitor_restaurant_id"];
+			}
+			else
+				return -1;
+		}
+		else {
+
+			$results = $this->competitorcity->find("all",array(
+				"conditions" => array(
+					"competitorcity.referral" => "efood",
+					"competitorcity.city_id > 0"
+				)
+			));
+
+			$competitor_cities = $this->competitorcity->find("list", array(
+				"fields" => array("competitorcity.city_id", "competitorcity.city_name"),
+				"conditions" => array(
+					"competitorcity.referral" => "efood"
+				),
+				"order" => "competitorcity.city_name ASC"
+			));
+
+
+			# Get restaurants from cities except (athens/thessaloniki)
+			$fields = array(
+				"citydetail.city_name",
+				"city.city_id",
+				"city.prefecture_id",
+				"restaurantdetail.restaurant_name",
+				"restaurantdetail.restaurant_id"
+			);
+
+			$conditions = array(
+				"restaurantdetail.language_id" => 2,
+				"restaurant.is_active" => "Y",
+				"restaurant.is_deleted" => "N",
+				"competitorrestaurant.competitor_restaurant_line_id IS NULL"
+			);
+
+			$resultsOfPrefectureRestaurantsForMatching = $this->restaurant->find("all", array(
+				"recursive" => -1,
+				"fields" => $fields,
+				"joins" => array(
+					array(
+						"table" => "restaurant_detail",
+						"alias" => "restaurantdetail",
+						"type" => "LEFT",
+						"conditions" => array(
+							"restaurantdetail.restaurant_id = restaurant.restaurant_id"
+						)
+					),
+					array(
+						"table" => "city_master",
+						"alias" => "city",
+						"type" => "INNER",
+						"conditions" => array(
+							"city.city_id = restaurant.restaurant_city_id"
+						)
+					),
+					array(
+						"table" => "city_detail",
+						"alias" => "citydetail",
+						"type" => "INNER",
+						"conditions" => array(
+							"citydetail.city_id = city.city_id",
+							"citydetail.language_id = restaurantdetail.language_id"
+						)
+					),
+					array(
+						"table" => "competitor_city_master",
+						"alias" => "competitorcity",
+						"type" => "LEFT",
+						"conditions" => array(
+							"competitorcity.city_id = city.prefecture_id"
+						)
+					),
+					array(
+						"table" => "competitor_restaurant_master",
+						"alias" => "competitorrestaurant",
+						"type" => "LEFT",
+						"conditions" => array(
+							"competitorrestaurant.restaurant_id = restaurant.restaurant_id"
+						)
+					)
+				),
+				"order" => "citydetail.city_name ASC, restaurantdetail.restaurant_name",
+				"conditions" => array(
+					"restaurantdetail.language_id" => 2,
+					"restaurant.is_active" => "Y",
+					"restaurant.is_deleted" => "N",
+					"competitorrestaurant.competitor_restaurant_line_id IS NULL",
+					"OR" => array(
+						"city.prefecture_id = 1",
+						"city.prefecture_id = 2"
+						)
+				)
+			));
+
+			$resultsOfCityRestaurantsForMatching = $this->restaurant->find("all", array(
+				"recursive" => -1,
+				"fields" => $fields,
+				"joins" => array(
+					array(
+						"table" => "restaurant_detail",
+						"alias" => "restaurantdetail",
+						"type" => "LEFT",
+						"conditions" => array(
+							"restaurantdetail.restaurant_id = restaurant.restaurant_id"
+						)
+					),
+					array(
+						"table" => "city_master",
+						"alias" => "city",
+						"type" => "INNER",
+						"conditions" => array(
+							"city.city_id = restaurant.restaurant_city_id"
+						)
+					),
+					array(
+						"table" => "city_detail",
+						"alias" => "citydetail",
+						"type" => "INNER",
+						"conditions" => array(
+							"citydetail.city_id = city.city_id",
+							"citydetail.language_id = restaurantdetail.language_id"
+						)
+					),
+					array(
+						"table" => "competitor_city_master",
+						"alias" => "competitorcity",
+						"type" => "LEFT",
+						"conditions" => array(
+							"competitorcity.city_id = city.city_id"
+						)
+					),
+					array(
+						"table" => "competitor_restaurant_master",
+						"alias" => "competitorrestaurant",
+						"type" => "LEFT",
+						"conditions" => array(
+							"competitorrestaurant.restaurant_id = restaurant.restaurant_id"
+						)
+					)
+				),
+				"order" => "citydetail.city_name ASC, restaurantdetail.restaurant_name",
+				"conditions" => array(
+					"restaurantdetail.language_id" => 2,
+					"restaurant.is_active" => "Y",
+					"restaurant.is_deleted" => "N",
+					"competitorrestaurant.competitor_restaurant_line_id IS NULL",
+					"city.prefecture_id != 1",
+					"city.prefecture_id != 2"
+				)
+			));
+
+			$resultsOfPrefectureRestaurantsForMatching = Set::combine($resultsOfPrefectureRestaurantsForMatching, '{n}.restaurantdetail.restaurant_id', '{n}', '{n}.citydetail.city_name');
+			$resultsOfCityRestaurantsForMatching = Set::combine($resultsOfCityRestaurantsForMatching, '{n}.restaurantdetail.restaurant_id', '{n}', '{n}.citydetail.city_name');
+
+			$cdRegionRestaurants = array_merge($resultsOfPrefectureRestaurantsForMatching, $resultsOfCityRestaurantsForMatching);
+
+			$this->set("cdRegionRestaurants", $cdRegionRestaurants);
+
+			$this->set("competitor_cities", $competitor_cities);
+
+			$this->set('competitor_report', $results);
+		}
+	}
+
+	function admin_competitor_restaurant_match($prefectureId = null, $restaurantId = null, $restaurantSource = "efood") {
+		$this->admin_checkSession();
+
+		// Get competitor restaurant info
+		if($restaurantSource == "efood") {
+			$competitorRestaurantId = $restaurantId;
+			if (!empty($restaurantId)) {
+				$restaurantData = $this->competitorcity->find("first",array(
+					"recursive" => -1,
+					"fields" => array("competitorrestaurant.*"),
+					"joins" => array(
+						array(
+							"table" => "competitor_restaurant_master",
+							"alias" => "competitorrestaurant",
+							"type" => "LEFT",
+							"conditions" => array(
+								"competitorrestaurant.competitor_city_id = competitorcity.city_id"
+							)
+						)
+					),
+					"conditions" => array(
+						"competitorcity.referral" => "efood",
+						"competitorcity.prefecture_id" => $prefectureId,
+						"competitorrestaurant.competitor_restaurant_id" => $restaurantId,
+						"competitorrestaurant.restaurant_id" => 0,
+						"competitorrestaurant.not_in_cd" => 'N'
+					)
+				));
+
+				if(!empty($restaurantData)) {
+					$restaurantData['competitorrestaurant']['prefectureId'] = $prefectureId;
+				}
+				$this->set("restaurantData", $restaurantData);
+			}
+			//  if there are any post data
+			if(isset($this->data)) {
+				Configure::write("debug", 0);
+				$this->autoRender = false;
+				$status = "error";
+				if(!empty($this->data['ignoreMatching'])) {
+					if($this->competitorrestaurant->save(array(
+						'competitor_restaurant_line_id' => $restaurantData['competitorrestaurant']['competitor_restaurant_line_id'],
+						'not_in_cd' => 'Y'
+						))) {
+						$status = "success";
+						$message = "Restaurant ignored";
+					}
+					else {
+						$message = "Couldn't be updated 1";
+					}
+				}
+				else if(!empty($this->data['cdRestaurantId'])) {
+					if($this->competitorrestaurant->save(array(
+						'competitor_restaurant_line_id' => $restaurantData['competitorrestaurant']['competitor_restaurant_line_id'],
+						'not_in_cd' => 'N',
+						'restaurant_id' => $this->data['cdRestaurantId']
+						))) {
+						$status = "success";
+						$message = "Restaurant matched successfully";
+					}
+					else {
+						$message = "Couldn't be updated 2";
+					}
+				}
+				return $status;
+			}
+			else {
+				// Get unmatched resturants from prefecture_id
+				if(!empty($prefectureId) && !empty($restaurantData)) {
+					$conditions = array(
+							"language_id" => 2,
+							"competitorrestaurant.restaurant_id is NULL");
+					if($prefectureId == 1 || $prefectureId == 2) {
+						$conditions['city.prefecture_id'] = $prefectureId;
+					}
+					else {
+						$conditions['city.city_id'] = $prefectureId;
+					}
+					$resultsOfRestaurantsForMatching = $this->restaurant->find("all", array(
+						"recursive" => -1,
+						"fields" => array("restaurantdetail.restaurant_name, restaurant.restaurant_id, restaurant.restaurant_shortname, restaurant.is_active, restaurant.is_deleted"),
+						"joins" => array(
+							array(
+								"table" => "city_master",
+								"alias" => "city",
+								"type" => "LEFT",
+								"conditions" => array(
+									"city.city_id = restaurant.restaurant_city_id"
+								)
+							),
+							array(
+								"table" => "restaurant_detail",
+								"alias" => "restaurantdetail",
+								"type" => "LEFT",
+								"conditions" => array(
+									"restaurantdetail.restaurant_id = restaurant.restaurant_id"
+								)
+							),
+							array(
+								"table" => "competitor_restaurant_master",
+								"alias" => "competitorrestaurant",
+								"type" => "LEFT",
+								"conditions" => array(
+									"competitorrestaurant.restaurant_id = restaurant.restaurant_id"
+								)
+							)
+						),
+						"order" => "restaurantdetail.restaurant_name ASC",
+						"conditions" => $conditions
+					));
+
+					$this->set("restaurantResults", $resultsOfRestaurantsForMatching);
+
+					if(!empty($restaurantData)) {
+						$competitorRestaurantName = $restaurantData['competitorrestaurant']['restaurant_name'];
+
+						$search  = array(" ", "`", "'", ".", "-", "_", "!", ";", "/");
+						$replace = array("", "", "", "", "", "", "", "", "");
+						$pattern = '/[(].*[)]/i';
+						$competitorRestaurantName = strtolower(str_replace($search,$replace,$competitorRestaurantName));
+						$competitorRestaurantName = preg_replace($pattern, "", $competitorRestaurantName);
+						$restaurantData['competitorrestaurant']['similar_with'] = 0;
+						for ($i=0; $i< count($resultsOfRestaurantsForMatching); $i++) {
+							$cdRestaurantName = $resultsOfRestaurantsForMatching[$i]['restaurantdetail']['restaurant_name'];
+							$cdRestaurantName = strtolower(str_replace($search,$replace,$cdRestaurantName));
+							$cdRestaurantName = preg_replace($pattern, "", $cdRestaurantName);
+
+							similar_text($cdRestaurantName, $competitorRestaurantName, $percent);
+							if($percent > 90.0) {
+								$restaurantData['competitorrestaurant']['similar_with'] = $resultsOfRestaurantsForMatching[$i]['restaurant']['restaurant_id'];
+							}
+						}
+						$this->set("restaurantData", $restaurantData);
+					}
+				}
+			}
+		}
+		else if($restaurantSource == "cd") {
+			if (!empty($restaurantId)) {
+				$restaurantData = $this->restaurant->find("first",array(
+					"recursive" => -1,
+					"fields" => array("
+						restaurantdetail.restaurant_id,
+						restaurantdetail.restaurant_name,
+						restaurant.restaurant_city_id,
+						restaurant.restaurant_shortname
+					"),
+					"joins" => array(
+						array(
+							"table" => "restaurant_detail",
+							"alias" => "restaurantdetail",
+							"type" => "LEFT",
+							"conditions" => array(
+								"restaurantdetail.restaurant_id = restaurant.restaurant_id"
+							)
+						)
+					),
+					"conditions" => array(
+						"restaurantdetail.language_id" => 2,
+						"restaurant.restaurant_id" => $restaurantId
+					)
+				));
+			}
+			//  if there are any post data
+			if(isset($this->data)) {
+				Configure::write("debug", 0);
+				$this->autoRender = false;
+				$status = "error";
+
+				if(!empty($this->data['cdRestaurantId'])) {
+					if($this->competitorrestaurant->save(array(
+						'competitor_restaurant_line_id' => $this->data['cdRestaurantId'],
+						'restaurant_id' => $restaurantId,
+						"not_in_cd" => 'N'
+						))) {
+						$status = "success";
+						$message = "Restaurant matched successfully";
+					}
+					else {
+						$message = "Couldn't be updated 2";
+					}
+				}
+				return $status;
+			}
+			else {
+				// Get unmatched resturants from prefecture_id
+				if(!empty($prefectureId) && !empty($restaurantData)) {
+					$resultsOfRestaurantsForMatching = $this->competitorcity->find("all", array(
+						"recursive" => -1,
+						"fields" => "competitorcity.*, competitorrestaurant.*",
+						"joins" => array(
+							array(
+								"table" => "competitor_restaurant_master",
+								"alias" => "competitorrestaurant",
+								"type" => "LEFT",
+								"conditions" => array(
+									"competitorrestaurant.competitor_city_id = competitorcity.city_id"
+								)
+							)
+						),
+						"order" => "competitorrestaurant.restaurant_name ASC",
+						"conditions" => array(
+							"competitorcity.prefecture_id" => $prefectureId,
+							"competitorrestaurant.is_deleted" => "N",
+							"competitorrestaurant.restaurant_id" => 0
+						)
+					));
+
+					$this->set("restaurantResults", $resultsOfRestaurantsForMatching);
+				}
+
+				if(!empty($restaurantData)) {
+					$firstRestaurantName = $restaurantData['restaurantdetail']['restaurant_name'];
+
+					$search  = array(" ", "`", "'", ".", "-", "_", "!", ";", "/");
+					$replace = array("", "", "", "", "", "", "", "", "");
+					$pattern = '/[(].*[)]/i';
+					$firstRestaurantName = strtolower(str_replace($search,$replace,$firstRestaurantName));
+					$firstRestaurantName = preg_replace($pattern, "", $firstRestaurantName);
+					$restaurantData['restaurant']['similar_with'] = 0;
+					for ($i=0; $i< count($resultsOfRestaurantsForMatching); $i++) {
+						$secondRestaurantName = $resultsOfRestaurantsForMatching[$i]['competitorrestaurant']['restaurant_name'];
+						$secondRestaurantName = strtolower(str_replace($search,$replace,$secondRestaurantName));
+						$secondRestaurantName = preg_replace($pattern, "", $secondRestaurantName);
+
+						similar_text($secondRestaurantName, $firstRestaurantName, $percent);
+						if($percent > 90.0) {
+							$restaurantData['restaurant']['similar_with'] = $resultsOfRestaurantsForMatching[$i]['competitorrestaurant']['competitor_restaurant_line_id'];
+						}
+					}
+				}
+				$this->set("restaurantData", $restaurantData);
+			}
+
+		}
+		$this->set("restaurantSource", $restaurantSource);
+	}
+
+	function admin_competitoraddresslocality() {
+	}
+
+	function admin_insert_to_competitoraddresslocality() {
+		$competitor_restaurant_master_to_be_fetched = $this->competitorrestaurant->find("all", array(
+			"fields" => "competitorrestaurant.address_locality, competitorrestaurant.competitor_city_id",
+			"order" => array(
+				"competitorrestaurant.address_locality ASC"
+			),
+			"group" => array("competitorrestaurant.address_locality")
+		));
+		$this->set("competitor_restaurant_master_to_be_fetched", $competitor_restaurant_master_to_be_fetched);
+		$data = array();
+		foreach ($competitor_restaurant_master_to_be_fetched as $value) {
+			if ($value['competitorrestaurant']['address_locality'] != "." && !empty($value['competitorrestaurant']['address_locality'])) {
+				$sub_data = array();
+				$sub_data['competitor_addresslocality_name'] = $value['competitorrestaurant']['address_locality'];
+				$sub_data['competitor_city_id'] = $value['competitorrestaurant']['competitor_city_id'];
+				$data[] = $sub_data;
+			}
+		}
+		if($this->competitoraddresslocality->saveAll($data, array('validate'=>'first'))) {
+			debug("success");
+		}
+	}
+
 	private function execute_query() {
 		$query_key = $this->data['report']['query'];
 		if ( isset($this->custom_stats_queries[$query_key]) ) {
 			$query = $this->custom_stats_queries[$query_key]['query'];
+			
+			$db = ConnectionManager::getInstance();
+			$conn = $db->getDataSource('default');
 
 			if ($query_key == "coupon_stats" && $this->data['coupon_code'] == "" ) {
 				$query = "SELECT LEFT(`promo_id`, 3) AS COUPON_SERIES, description AS DESCRIPTION, COUNT(*) AS ISSUED_COUPONS FROM `user_promos` GROUP BY COUPON_SERIES ORDER BY i_date DESC";
@@ -2336,14 +3363,39 @@ class ReportsController extends AppController {
 						// debug($query);
 					}
 				}
-			}
-			// debug($query);
-			// debug($this->data);
-			
-			$db = ConnectionManager::getInstance();
-			$conn = $db->getDataSource('default');
+				
+				if (isset($this->custom_stats_queries[$query_key]["fields_order"])) {
+					$data = $conn->fetchall($query); 
 
-			return $conn->fetchall($query);
+					$ordered_fields_array = array(
+						array()
+					);
+					
+					for ($i=0;$i<count($data);$i++) {
+						$ordered_fields_array[] = array();
+						foreach ($this->custom_stats_queries[$query_key]["fields_order"] as $ordered_field) {
+							$j=0;
+							foreach ($data[$i] as $key => $value) {
+								foreach ($value as $key_row => $value_row) {
+									if ($key_row == $ordered_field) {
+										$ordered_fields_array[$i][$j][$key_row] = $value_row;
+										break;
+									}
+								}
+							}
+							$j++;
+						}
+					}
+				}
+			}
+			
+			if (isset($this->custom_stats_queries[$query_key]["fields_order"])) {
+				return $ordered_fields_array;
+			}
+			else {
+				return $conn->fetchall($query);	
+			}
+			
 		}
 		else {
 			$this->Session->write("ERROR_MESSAGE", __("No or invalid query provided", true));

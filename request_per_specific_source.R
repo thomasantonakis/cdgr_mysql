@@ -10,9 +10,9 @@ rs <- dbSendQuery(con,"
                   
                         SELECT `referal_source` as source ,`status` as status , COUNT(*) as count 
                         FROM  `user_master` 
-                        WHERE  `referal_source` LIKE  '%cosmo%'
-                        AND `i_date` >= UNIX_TIMESTAMP('2015-01-25')
-                        AND `i_date` < UNIX_TIMESTAMP('2015-02-04')
+                        WHERE  `referal_source` LIKE  '%larisaout%'
+                        AND `i_date` >= UNIX_TIMESTAMP('2015-03-25')
+                        AND `i_date` < UNIX_TIMESTAMP('2015-03-30')
                         GROUP BY `referal_source`, `status`
                   
                   
@@ -29,8 +29,8 @@ proc.time() - ptm
 ##### RGA ga:sourceMedium
 
 ############################################
-startdate='2015-01-20' ##Start Date#########
-enddate='2015-02-02' ####End Date###########
+startdate='2015-03-25' ##Start Date#########
+enddate='2015-03-30' ####End Date###########
 ############################################
 library(RGA)
 # Authenticate Google Analytics
@@ -61,6 +61,6 @@ analytics<-get_ga(25764841, start.date = startdate, end.date = enddate,
 ## cosmoradio einai to source tou campaign
 ## banner einai to medium tou campaign
 
-analytics[grep("cosmoradio", analytics$sourceMedium , ignore.case=FALSE, fixed=FALSE),]
+analytics[grep("larisaout", analytics$sourceMedium , ignore.case=FALSE, fixed=FALSE),]
 View(d1)
 proc.time() - ptm

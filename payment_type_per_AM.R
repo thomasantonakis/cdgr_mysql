@@ -13,13 +13,12 @@ con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "be
 rs <- dbSendQuery(con, "
                   
                   
-                  SELECT FROM_UNIXTIME(`restaurant_balance`.`i_date`) AS date,
-                        `restaurant_balance`.`restaurant_id` AS rest,
-                        `restaurant_master`.`restaurant_shortname` as name,
+                  SELECT year(`restaurant_balance`.`transaction_date`) as year,
+                         month(`restaurant_balance`.`transaction_date`) AS month,
                         `restaurant_balance`.`balance_type` AS type,
-                        `restaurant_balance`.`balance_amount` AS amount,
-                        `prefecture_detail`.`prefecture_name` AS prefecture ,
-                        `user_master`.`last_name` AS account_manager
+                        
+                        -sum(`restaurant_balance`.`balance_amount`) AS amount
+                        
                   
                   FROM `restaurant_balance`
                                 JOIN `restaurant_master`
@@ -33,11 +32,12 @@ rs <- dbSendQuery(con, "
 				LEFT JOIN `user_master`
 				ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
                   
-                  WHERE `restaurant_balance`.`i_date` >= UNIX_TIMESTAMP('2015-01-01')
-                  AND `restaurant_balance`.`i_date` < UNIX_TIMESTAMP('2015-03-01')
+                  WHERE `restaurant_balance`.`transaction_date` >= '2015-01-01'
+                  AND `restaurant_balance`.`transaction_date` < '2015-02-01'
+                  AND  `balance_type` IN ('CASH PAYMENT',  'EUROBANK PAYMENT',  'PIRAEUS PAYMENT', 'SETOFF')
 
-                          
-                  
+                  group by  year, month,  type
+                  ORDER BY year ,month, type
                   
                   
                   ")
@@ -48,10 +48,10 @@ dbDisconnect(con)
 # Stop timer
 proc.time() - ptm
 
-report<-as.data.frame(table(invoices$account_manager, invoices$type, useNA="ifany"))
-report<-report %>% spread(Var2, Freq)
+# report<-as.data.frame(table(invoices$account_manager, invoices$type, useNA="ifany"))
+# report<-report %>% spread(Var2, Freq)
 
 # Set working directory
 setwd("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Ad Hoc")
 # Export
-write.xlsx(x=report, file = "Payments_per_AM.xlsx")
+# write.xlsx(x=report, file = "Payments_per_AM.xlsx")

@@ -38,7 +38,7 @@ rs <- dbSendQuery(con,"
                   ON (`restaurant_detail`.`restaurant_id` = `restaurant_master`.`restaurant_id` AND `restaurant_detail`.`language_id` = 1)
                   
                   
-                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-02-26')
+                  WHERE  `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-03-10')
                   and ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
                   and  `restaurant_detail`.`language_id` = 1
                   
@@ -57,7 +57,7 @@ proc.time() - ptm
 orders<-rbind(orders, new_orders)
 orders<-distinct(orders)
 
-
+gc()
 # Recalculate ord_user, lod, ord_user
 ord_user<-as.data.frame(table(orders$user_id))
 names(ord_user)<-c("user_id", "orders")
@@ -85,7 +85,7 @@ wo_oldest<-arrange(orders, user_id, order_date)
 wo_oldest$index<- FALSE
 wo_oldest$index[2:nrow(wo_oldest)]<-wo_oldest$user_id[2:nrow(wo_oldest)] == wo_oldest$user_id[1:(nrow(wo_oldest)-1)]
 wo_oldest<-wo_oldest[wo_oldest$index,]
-
+gc()
 # Recalculate ord_user, lod, ord_user
 ord_user_wo_oldest<-as.data.frame(table(wo_oldest$user_id))
 names(ord_user_wo_oldest)<-c("user_id", "orders")

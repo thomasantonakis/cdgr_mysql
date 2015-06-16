@@ -1,6 +1,6 @@
 # # Load package
 library(RMySQL)
-library(xlsx)
+# library(xlsx)
 # # Set timer
 ptm <- proc.time()
 # Establish connection
@@ -16,8 +16,8 @@ SELECT count(*) AS users,
                 MONTH(FROM_UNIXTIME(`user_master`.`verification_date`)) as month
 FROM `user_master`
 
-WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2014-01-01')
-AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-04-01')
+WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-05-01')
+AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-06-01')
 AND `user_master`.`verification_date` - `user_master`.`i_date` <= 86400
 AND `user_master`.`status` = 'VERIFIED'
 AND `user_master`.`is_deleted` = 'N'
@@ -30,4 +30,7 @@ GROUP BY source, year, month
 active_users <- dbFetch(rs, n=-1) 
 # close connection
 dbDisconnect(con)
-write.xlsx(x= active_users, file= "export.xlsx")
+# Stop timer
+proc.time() - ptm
+
+write.csv(x= active_users, file= "export.csv")
