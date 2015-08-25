@@ -30,8 +30,8 @@ LEFT JOIN `prefecture_detail`
 LEFT JOIN `user_master`
         ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
 
-WHERE   `restaurant_master`.`signoff_date` >= '2015-05-01'
-        AND `restaurant_master`.`signoff_date` < '2015-06-01'
+WHERE   `restaurant_master`.`signoff_date` >= '2015-07-01'
+        AND `restaurant_master`.`signoff_date` < '2015-08-01'
 
 
 

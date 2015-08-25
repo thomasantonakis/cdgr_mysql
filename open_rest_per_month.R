@@ -30,7 +30,7 @@ LEFT JOIN `user_master`
         ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
 
 WHERE   `restaurant_master`.`start_date` >= '2014-01-01'
-        AND `restaurant_master`.`start_date` < '2015-04-01'
+        AND `restaurant_master`.`start_date` < '2015-08-01'
 
 GROUP BY year, MONTH, CITY_NAMe 
 

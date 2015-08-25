@@ -1035,8 +1035,8 @@ accounts$desc<-c('website', 'android', 'ios', 'youtube')
 rm(accs)
 
 
-startdate = as.Date('2013-1-1')
-enddate = as.Date('2015-5-31')
+startdate = as.Date('2015-7-1')
+enddate = as.Date('2015-7-31')
 
 adwords<-get_ga(25764841, start.date = startdate, end.date = enddate,
                 

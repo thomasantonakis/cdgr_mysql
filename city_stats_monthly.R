@@ -32,7 +32,7 @@ rs <- dbSendQuery(con,"
 
                   
                   
-                WHERE `date` >=  '2015-06-08' AND `date` <=  '2015-06-15'
+                WHERE `date` >=  '2015-08-17' AND `date` <=  '2015-08-23'
                   
                 ORDER BY date ASC
                   

@@ -16,8 +16,8 @@ SELECT count(*) AS users,
                 MONTH(FROM_UNIXTIME(`user_master`.`verification_date`)) as month
 FROM `user_master`
 
-WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-05-01')
-AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-06-01')
+WHERE `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-07-01')
+AND `user_master`.`verification_date` < UNIX_TIMESTAMP('2015-08-01')
 AND `user_master`.`verification_date` - `user_master`.`i_date` <= 86400
 AND `user_master`.`status` = 'VERIFIED'
 AND `user_master`.`is_deleted` = 'N'
@@ -33,4 +33,4 @@ dbDisconnect(con)
 # Stop timer
 proc.time() - ptm
 
-write.csv(x= active_users, file= "export.csv")
+write.csv2(x= active_users, file= "export.csv")

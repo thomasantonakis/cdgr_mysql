@@ -29,7 +29,7 @@ ON (`prefecture_detail`.`language_id` = 1 AND `city_master`.`prefecture_id` = `p
 
 WHERE `user_master`.`is_deleted` = 'N' 
        AND `user_master`.`i_date` >= UNIX_TIMESTAMP('2009-01-01')
-       AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-06-01')
+       AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-08-01')
 
 
 GROUP BY YEAR, MONTH, CITY_NAME
@@ -45,4 +45,4 @@ dbDisconnect(con)
 proc.time() - ptm
 
 
-write.csv(reg_per_area, file = "export.csv",row.names=FALSE)
+write.csv2(reg_per_area, file = "export.csv",row.names=FALSE)

@@ -32,7 +32,7 @@ LEFT JOIN `user_master`
         ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
 
 WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
-        
+        AND `restaurant_master`.`country_id`=0
         AND `order_master`.`i_date` < UNIX_TIMESTAMP('2016-01-01')
 
 GROUP BY rest_id
@@ -46,4 +46,4 @@ dbDisconnect(con)
 proc.time() - ptm
 
 
-write.csv(first_order, file = "export.csv",row.names=FALSE)
+write.csv2(first_order, file = "export.csv",row.names=FALSE)

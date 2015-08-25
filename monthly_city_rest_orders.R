@@ -35,8 +35,8 @@ LEFT JOIN `prefecture_detail`
 ON (`prefecture_detail`.`language_id` =1 AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
 
 WHERE ((`order_master`.`is_deleted` = 'N') AND ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
-AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2014-01-01')
-AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-06-01')
+AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-08-01')
+AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-09-01')
 
 GROUP BY year, month, `order_master`.`restaurant_id`
 ORDER BY year ASC, month ASC,`restaurant_city_id` ASC, `restaurant_shortname` ASC

@@ -26,8 +26,8 @@ SELECT
 				
 				
                                 where ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
-				AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-01')
-				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-06-01')
+				AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-07-01')
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-08-01')
 
 				GROUP BY  referral,month, year
 				
@@ -44,7 +44,7 @@ dbDisconnect(con)
 proc.time() - ptm
 
 # Write CSV in R
-write.csv(data, file = "export.csv",row.names=FALSE)
+write.csv2(data, file = "export.csv",row.names=FALSE)
 
 
 # write.xlsx(x=data, file='commissions.xlsx')

@@ -12,8 +12,8 @@ con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "be
 # Send query
 rs <- dbSendQuery(con,"
 
-SELECT  `restaurant_shortname` AS restaurant, MONTHNAME( FROM_UNIXTIME(  `order_master`.`i_date` ) ) AS 
-MONTH , YEAR( FROM_UNIXTIME(  `order_master`.`i_date` ) ) AS YEAR, COUNT( * ) AS orders, SUM(  `order_amt` ) AS totals, SUM(  `order_commission` ) AS commissions
+SELECT  MONTHNAME( FROM_UNIXTIME(  `order_master`.`i_date` ) ) AS 
+MONTH , YEAR( FROM_UNIXTIME(  `order_master`.`i_date` ) ) AS YEAR, `order_amt` 
 FROM  `order_master` 
 JOIN  `restaurant_master` 
 USING (  `restaurant_id` ) 
@@ -22,10 +22,9 @@ AND (
         `order_master`.`status` =  'VERIFIED'
         OR  `order_master`.`status` =  'REJECTED'
 )
-AND FROM_UNIXTIME(  `order_master`.`i_date` ) >=  '2015-07-01'
-AND FROM_UNIXTIME(  `order_master`.`i_date` ) <  '2015-08-01'
-GROUP BY  `restaurant_shortname`  
-ORDER BY  `restaurant_shortname` 
+AND FROM_UNIXTIME(  `order_master`.`i_date` ) >=  '2015-06-01'
+AND FROM_UNIXTIME(  `order_master`.`i_date` ) <  '2015-07-01'
+
 
                   
                   ")
@@ -36,5 +35,10 @@ dbDisconnect(con)
 # Stop timer
 proc.time() - ptm
 
-write.xlsx(x=data, file='goodys.xlsx')
+# write.xlsx(x=data, file='goodys.xlsx')
+summary(data$order_amt)
+round(sum(data$order_amt<12)/dim(data)[1]*100,2)
 
+hist(data$order_amt[data$order_amt<=30], breaks = seq(7, 31, by = 1), freq=F, main="June Goodys orders distribution", 
+     xlab="Basket")
+abline(v=8, col="red")

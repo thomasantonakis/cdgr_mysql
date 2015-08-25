@@ -33,8 +33,8 @@ SELECT
         			ON (`prefecture_detail`.`language_id` = 1 AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
 
 				WHERE ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
-				AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-01')
-				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-06-01')
+				AND `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-07-01')
+				AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-08-01')
 
 
 				GROUP BY  year, month, pref

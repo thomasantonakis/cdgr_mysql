@@ -4,7 +4,7 @@ ptm <- proc.time()
 #########################################
 
 # Load previously exported csv
-report<-read.csv('wmf.csv', stringsAsFactors = FALSE)
+report<-read.csv2('wmf.csv', stringsAsFactors = FALSE)
 report$date<-as.Date(report$date)
 
 # Load package
@@ -302,6 +302,7 @@ report<-rbind(report,tbadded)
 
 # Finally , make the report lazy so as to calculate only the new rows required for the report.
 rm(tbadded)
-write.csv(report, file = "wmf.csv",row.names=FALSE)
+write.csv2(active_users, file = "export.csv",row.names=FALSE)
+write.csv2(report, file = "wmf.csv",row.names=FALSE)
 # Stop timer
 proc.time() - ptm

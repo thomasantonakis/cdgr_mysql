@@ -19,7 +19,7 @@ rs <- dbSendQuery(con,"
                   FROM `user_master`
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-12')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
                   AND `user_master`.`referal_source`  LIKE '%Android|quizdom%'
                   
@@ -60,8 +60,9 @@ rs <- dbSendQuery(con,"
                   FROM `user_master`
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-12')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
+                  AND `user_master`.`referal_source`  LIKE '%Android|quizdom%'
                   
                   
                   ")
@@ -73,7 +74,7 @@ dbDisconnect(con)
 proc.time() - ptm
 
 # andd2<-andd2[andd2$SOURCE=='Android|quizdom|cpr|quizdom_registration|campaign_id:574856',1:2]
-andd2<-andd2[grep("Android\\|quizdom", andd2$SOURCE),]
+# andd2<-andd2[grep("Android\\|quizdom", andd2$SOURCE),]
 andd2$date<-as.Date(andd2$date)
 andd2$verified<-as.Date(andd2$verified)
 
@@ -90,19 +91,19 @@ substrRight <- function(x, n){
 quizdom_verified_and<-as.data.frame(substrRight(andd2[andd2$status=="VERIFIED",3], nchar(andd2[andd2$status=="VERIFIED",3])
                                                 -rev(gregexpr("\\:",  andd2[andd2$status=="VERIFIED",3])[[1]])[1]))
 # Create data-frame in order to be saved in file
-quizdom_verified_and<-cbind(andd2[andd2$status=="VERIFIED",c(1,4:8)],quizdom_verified_and )
+quizdom_verified_and<-cbind(andd2[andd2$status=="VERIFIED",c(1,2,4:8)],quizdom_verified_and )
 # Correct names
-names(quizdom_verified_and)<-c("user_id", "date","verified", "mobile", "email", "sms", "username")
+names(quizdom_verified_and)<-c("user_id","status" ,"date","verified", "mobile", "email", "sms", "username")
 # Sort the dataframe so as to know what has already been given out
 quizdom_verified_and <- quizdom_verified_and[order(quizdom_verified_and$verified),] 
 
 # Registrations
-quizdom_reg_and<-as.data.frame(substrRight(andd2[andd2$status!="VERIFIED",3], nchar(andd2[andd2$status!="VERIFIED",3])
-                                           -rev(gregexpr("\\:",  andd2[andd2$status!="VERIFIED",3])[[1]])[1]))
+quizdom_reg_and<-as.data.frame(substrRight(andd2[andd2$status=="NEW",3], nchar(andd2[andd2$status=="NEW",3])
+                                           -rev(gregexpr("\\:",  andd2[andd2$status=="NEW",3])[[1]])[1]))
 # Create data-frame in order to be saved in file
-quizdom_reg_and<-cbind(andd2[andd2$status!="VERIFIED",c(1,4:8)],quizdom_reg_and )
+quizdom_reg_and<-cbind(andd2[andd2$status=="NEW",c(1,2,4:8)],quizdom_reg_and )
 # Correct names
-names(quizdom_reg_and)<-c("user_id", "date","verified", "mobile", "email", "sms", "username")
+names(quizdom_reg_and)<-c("user_id","status" ,"date","verified", "mobile", "email", "sms", "username")
 # Sort the dataframe so as to know what has already been given out
 quizdom_reg_and <- quizdom_reg_and[order(quizdom_reg_and$verified),] 
 quizdom_reg_and$verified<-NULL
@@ -131,7 +132,7 @@ rs <- dbSendQuery(con,"
                   FROM `user_master`
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-21')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
                   AND `user_master`.`referal_source`  LIKE '%IOS|quizdom%'
                   
@@ -172,9 +173,9 @@ rs <- dbSendQuery(con,"
                   FROM `user_master`
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-21')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
-                  
+                  AND `user_master`.`referal_source`  LIKE '%IOS|quizdom%'
                   
                   ")
 # Fetch query results (n=-1) means all results
@@ -185,7 +186,7 @@ dbDisconnect(con)
 proc.time() - ptm
 
 # iosd2<-iosd2[iosd2$SOURCE=='IOS|quizdom|cpr|quizdom_registration|campaign_id:574856',1:2]
-iosd2<-iosd2[grep("IOS\\|quizdom", iosd2$SOURCE),]
+# iosd2<-iosd2[grep("IOS\\|quizdom", iosd2$SOURCE),]
 iosd2$date<-as.Date(iosd2$date)
 iosd2$verified<-as.Date(iosd2$verified)
 
@@ -202,19 +203,19 @@ iosd2$verified<-as.Date(iosd2$verified)
 quizdom_verified_ios<-as.data.frame(substrRight(iosd2[iosd2$status=="VERIFIED",3], nchar(iosd2[iosd2$status=="VERIFIED",3])
                                                 -rev(gregexpr("\\:",  iosd2[iosd2$status=="VERIFIED",3])[[1]])[1]))
 # Create data-frame in order to be saved in file
-quizdom_verified_ios<-cbind(iosd2[iosd2$status=="VERIFIED",c(1,4:8)],quizdom_verified_ios )
+quizdom_verified_ios<-cbind(iosd2[iosd2$status=="VERIFIED",c(1,2,4:8)],quizdom_verified_ios )
 # Correct names
-names(quizdom_verified_ios)<-c("user_id", "date","verified", "mobile", "email", "sms", "username")
+names(quizdom_verified_ios)<-c("user_id", "status","date","verified", "mobile", "email", "sms", "username")
 # Sort the dataframe so as to know what has already been given out
 quizdom_verified_ios <- quizdom_verified_ios[order(quizdom_verified_ios$verified),] 
 
 # Registrations
-quizdom_reg_ios<-as.data.frame(substrRight(iosd2[iosd2$status!="VERIFIED",3], nchar(iosd2[iosd2$status!="VERIFIED",3])
-                                           -rev(gregexpr("\\:",  iosd2[iosd2$status!="VERIFIED",3])[[1]])[1]))
+quizdom_reg_ios<-as.data.frame(substrRight(iosd2[iosd2$status=="NEW",3], nchar(iosd2[iosd2$status=="NEW",3])
+                                           -rev(gregexpr("\\:",  iosd2[iosd2$status=="NEW",3])[[1]])[1]))
 # Create data-frame in order to be saved in file
-quizdom_reg_ios<-cbind(iosd2[iosd2$status!="VERIFIED",c(1,4:8)],quizdom_reg_ios )
+quizdom_reg_ios<-cbind(iosd2[iosd2$status=="NEW",c(1,2,4:8)],quizdom_reg_ios )
 # Correct names
-names(quizdom_reg_ios)<-c("user_id", "date","verified", "mobile", "email", "sms", "username")
+names(quizdom_reg_ios)<-c("user_id", "status","date","verified", "mobile", "email", "sms", "username")
 # Sort the dataframe so as to know what has already been given out
 quizdom_reg_ios <- quizdom_reg_ios[order(quizdom_reg_ios$verified),] 
 quizdom_reg_ios$verified<-NULL
@@ -248,7 +249,7 @@ rs <- dbSendQuery(con,"
                   USING (`user_id`)
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-12')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
                   AND `user_master`.`referal_source`  LIKE '%quizdom%'
 
@@ -285,7 +286,7 @@ rs <- dbSendQuery(con,"
                   USING (`user_id`)
                   
                   WHERE `user_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-12')
-                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `user_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND `user_master`.`is_deleted` = 'N'
                   AND `user_master`.`referal_source`  LIKE '%quizdom%'
 
@@ -325,7 +326,7 @@ rs <- dbSendQuery(con,"
                   USING (`user_id`)
                   
                   WHERE `order_master`.`i_date` >= UNIX_TIMESTAMP('2015-05-12')
-                  AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-07-01')
+                  AND `order_master`.`i_date` < UNIX_TIMESTAMP('2015-10-01')
                   AND ((`order_master`.`is_deleted` = 'N') and ((`order_master`.`status` = 'VERIFIED') or (`order_master`.`status` = 'REJECTED')))
                   AND `order_master`.`order_referal`  LIKE '%quizdom%'
                   
@@ -381,14 +382,58 @@ export<-export[!is.na(export$mobile),]
 # Exclude quizdom emails! :-)
 export<-export[!grepl("quizdom", export$email),]
 
+# ###########################################
+# # Tracking for SMS
+# ###########################################
+# export<-export[export$date < '2015-06-15',]
+# export<-export[export$username!="",]
+# 
 # #Export the eligible for sms
 # setwd("C:/Users/tantonakis/Google Drive/MARKETING MIX/SYNERGIES (1)/Quizdom")
-# write.csv2(export[,c(1.3)], file = "quizdom_reg_sms.csv",row.names = FALSE)
+# write.csv2(export[,7], file = "tracking_for_q.csv",row.names = FALSE)
 # # write.xlsx(export, file="quizdom2.xlsx", row.names = FALSE)
 # setwd("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql")
+# ##########################################
+# # End Tracking for SMS
+# ###########################################
+
+
+# #Export the eligible for sms
+# setwd("C:/Users/tantonakis/Google Drive/MARKETING MIX/SYNERGIES (1)/Quizdom")
+# write.csv2(export[,c(1,4)], file = "tracking_for_q.csv",row.names = FALSE)
+# # write.xlsx(export, file="quizdom2.xlsx", row.names = FALSE)
+# setwd("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql")
+
+# SMS Evaluation
+# Establish connection
+con <- dbConnect(RMySQL::MySQL(), host = '172.20.0.1', port = 3307, dbname = "beta",
+                 user = "tantonakis", password = "2secret4usAll!")
+# Send query
+rs <- dbSendQuery(con,"
+                  SELECT 'Andoid' AS Device,count(`user_master`.`user_id`) as SMS_Verifications
+                  FROM `user_master`
+                  WHERE `user_master`.`i_date` <= UNIX_TIMESTAMP('2015-06-15')
+                  AND `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-06-18')
+                  AND `user_master`.`is_deleted` = 'N'
+                  AND `user_master`.`referal_source`  LIKE '%Android|quizdom%'
+                  UNION
+                  SELECT 'iOS' AS Device, count(`user_master`.`user_id`) as SMS_Verifications 
+                  FROM `user_master`
+                  WHERE `user_master`.`i_date` <= UNIX_TIMESTAMP('2015-06-15')
+                  AND `user_master`.`verification_date` >= UNIX_TIMESTAMP('2015-06-18')
+                  AND `user_master`.`is_deleted` = 'N'
+                  AND `user_master`.`referal_source`  LIKE '%ios|quizdom%'
+                  ")
+# Fetch query results (n=-1) means all results
+sms_eval <- dbFetch(rs, n=-1)
+# close connection
+dbDisconnect(con)
+# Stop timer
+proc.time() - ptm
 
 #Check with Export
 table(andd2$status)
 table(iosd2$status)
+colSums(sms_eval[-1])
 # Stop timer
 proc.time() - ptm

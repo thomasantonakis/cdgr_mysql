@@ -35,9 +35,8 @@ rs <- dbSendQuery(con, "
 				ON (`city_master`.`city_account_manager_id` = `user_master`.`user_id`)
                   
                   WHERE `restaurant_balance`.`i_date` >= UNIX_TIMESTAMP('2015-01-01')
-                  AND `restaurant_balance`.`i_date` < UNIX_TIMESTAMP('2015-04-01')
-                  AND  `balance_type` IN ('CASH PAYMENT',  'EUROBANK PAYMENT',  'PIRAEUS PAYMENT', 'SETOFF')
-
+                  AND `restaurant_balance`.`i_date` < UNIX_TIMESTAMP('2015-08-01')
+                  
                   GROUP BY year ,month,user_id, type
                   ORDER BY year ,month,user_id, type
                   
@@ -51,8 +50,10 @@ dbDisconnect(con)
 proc.time() - ptm
 
 
+# AND  `balance_type` IN ('CASH PAYMENT',  'EUROBANK PAYMENT',  'PIRAEUS PAYMENT', 'SETOFF', 'CREDITCARD')
+
 
 # Set working directory
-setwd("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Ad Hoc")
+# setwd("C:/Users/tantonakis/Google Drive/Scripts/AnalyticsProj/cdgr_mysql/Ad Hoc")
 # Export
-write.xlsx(x=invoices_2, file = "Payments_per_AM_type_month.xlsx")
+write.xlsx(x=invoices_2, file = "tommys.xlsx")

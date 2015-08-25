@@ -11,7 +11,7 @@ rs <- dbSendQuery(con, "
 
 
 SELECT          `prefecture_detail`.`prefecture_name` AS PREFECTURE,
-                COUNT(DISTINCT `restaurant_master`.`restaurant_id`) AS OPEN_RESTAURANTS
+                COUNT(*) AS Number 
 
                 FROM `restaurant_master`
                 JOIN `city_master`
@@ -21,9 +21,11 @@ SELECT          `prefecture_detail`.`prefecture_name` AS PREFECTURE,
                 JOIN `prefecture_detail`
                 ON (`prefecture_detail`.`language_id` = 1 AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
 
-                WHERE `restaurant_master`.`start_date` < now()
+                WHERE `restaurant_master`.`start_date` < '2015-08-01'
                 AND `restaurant_id` != 19
-                AND (`restaurant_master`.`signoff_date` IS NULL )
+                AND restaurant_master.country_id=0
+                AND (`restaurant_master`.`signoff_date` IS NULL  OR `restaurant_master`.`signoff_date` >= '2015-08-01')
+                
 
 
                 GROUP BY PREFECTURE 
@@ -39,9 +41,9 @@ dbDisconnect(con)
 # Stop timer
 proc.time() - ptm
 
-# Prepare to export
-setwd("C:/Users/tantonakis/Google Drive/BUSINESS ANALYSIS/Sales/Workings")
-write.xlsx(x=company, file='open_rest_prefecture.xlsx')
+# # Prepare to export
+# setwd("C:/Users/tantonakis/Google Drive/BUSINESS ANALYSIS/Sales/Workings")
+# write.xlsx(x=company, file='open_rest_prefecture.xlsx')
 # 
 # SELECT          `prefecture_detail`.`prefecture_name` AS PREFECTURE,
 # `city_detail`.`city_name` AS CITY,
