@@ -21,9 +21,10 @@ SELECT          `prefecture_detail`.`prefecture_name` AS PREFECTURE,
                 JOIN `prefecture_detail`
                 ON (`prefecture_detail`.`language_id` = 1 AND `city_master`.`prefecture_id` = `prefecture_detail`.`prefecture_id`)
 
-                WHERE `restaurant_master`.`start_date` < ('2015-06-01')
-                AND `restaurant_master`.`start_date` >= ('2015-05-01')
+                WHERE `restaurant_master`.`start_date` < ('2015-08-01')
+                AND `restaurant_master`.`start_date` >= ('2015-07-01')
                 AND `restaurant_id` != 19
+                AND `restaurant_master`.`country_id`=0
                 AND (`restaurant_master`.`signoff_date` IS NULL )
 
 
